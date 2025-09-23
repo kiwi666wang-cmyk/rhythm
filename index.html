@@ -293,9 +293,13 @@
     function showOptions() {
       alert("選項功能尚未開放，敬請期待！");
     }
+    document.addEventListener("contextmenu", function(e) {
+      e.preventDefault();
+    });
   </script>
 </body>
 </html>
+
 
 
 
