@@ -60,6 +60,17 @@
     #menuScreen {
       padding-top: 200px;
     }
+    @media (max-width: 600px) {
+      .hitkey {
+        width: 70px;
+        height: 70px;
+        font-size: 24px;
+      }
+      .hitbar {
+        width: 100%;
+        max-width: 480px;
+      }
+    }
   </style>
 </head>
 <body>
@@ -85,7 +96,8 @@
   </div>
 
   <audio id="hitSound" src="https://cdn.pixabay.com/download/audio/2022/03/15/audio_6e3e3b6f3f.mp3?filename=click-124467.mp3"></audio>
-    <script>
+
+  <script>
     const canvas = document.getElementById('gameCanvas');
     const ctx = canvas.getContext('2d');
     const W = canvas.width, H = canvas.height;
@@ -97,7 +109,6 @@
     let startTime = 0, running = false;
     let chart = [];
     let comboFlash = '';
-
     const hitSound = document.getElementById('hitSound');
 
     window.addEventListener('keydown', e => {
@@ -105,11 +116,21 @@
       const k = e.key.toLowerCase();
       if (keys.includes(k)) keyDown.add(k);
     });
-
     window.addEventListener('keyup', e => {
       const k = e.key.toLowerCase();
       if (keys.includes(k)) keyDown.delete(k);
     });
+
+    // 📱 手機觸控支援
+    keys.forEach(k => {
+      const el = document.getElementById('key-' + k);
+      el.addEventListener('touchstart', () => handleTouch(k));
+      el.addEventListener('click', () => handleTouch(k));
+    });
+    function handleTouch(k) {
+      keyDown.add(k);
+      setTimeout(() => keyDown.delete(k), 100);
+    }
 
     function updateHUD() {
       document.getElementById('score').textContent = score;
@@ -136,7 +157,6 @@
       hitSound.currentTime = 0;
       hitSound.play();
       flashKey(laneKey);
-
       if (combo % 10 === 0) {
         comboFlash = `COMBO x${combo}!!`;
         setTimeout(() => comboFlash = '', 800);
@@ -180,7 +200,7 @@
         const laneKey = keys[n.lane];
         if (near && keyDown.has(laneKey)) {
           judge(dtMs, laneKey);
-          keyDown.delete(laneKey); // 防止重複判定
+          keyDown.delete(laneKey);
           n.hit = true;
         }
         if (!n.hit && t - n.t > 0.2) {
@@ -191,43 +211,50 @@
     }
 
     function render() {
-      ctx.clearRect(0, 0, W, H);
-      ctx.strokeStyle = '#fff';
-      ctx.beginPath();
-      ctx.moveTo(0, judgeLineY);
-      ctx.lineTo(W, judgeLineY);
-      ctx.stroke();
+  ctx.clearRect(0, 0, W, H);
 
-      chart.forEach(n => {
-        if (n.hit) return;
-        const x = n.lane * laneWidth + laneWidth / 2;
-        ctx.fillStyle = '#78d5ff';
-        ctx.beginPath();
-        ctx.arc(x, n.y, 20, 0, Math.PI * 2);
-        ctx.fill();
-      });
+  // 判定線
+  ctx.strokeStyle = '#fff';
+  ctx.beginPath();
+  ctx.moveTo(0, judgeLineY);
+  ctx.lineTo(W, judgeLineY);
+  ctx.stroke();
 
-      if (lastJudgementText !== '-') {
-        ctx.fillStyle = '#fff';
-        ctx.font = 'bold 32px sans-serif';
-        ctx.textAlign = 'center';
-        ctx.fillText(lastJudgementText, W / 2, judgeLineY - 40);
-      }
+  // 音符
+  chart.forEach(n => {
+    if (n.hit) return;
+    const x = n.lane * laneWidth + laneWidth / 2;
+    ctx.fillStyle = '#78d5ff';
+    ctx.beginPath();
+    ctx.arc(x, n.y, 20, 0, Math.PI * 2);
+    ctx.fill();
+  });
 
-      if (comboFlash) {
-        ctx.fillStyle = '#ff78b5';
-        ctx.font = 'bold 36px sans-serif';
-        ctx.textAlign = 'center';
-        ctx.fillText(comboFlash, W / 2, H / 2 - 100);
-      }
+  // 判定文字
+  if (lastJudgementText !== '-') {
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold 32px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(lastJudgementText, W / 2, judgeLineY - 40);
+  }
 
-      if (!running && chart.every(n => n.hit)) {
-        ctx.fillStyle = '#fff';
-        ctx.font = 'bold 36px sans-serif';
-        ctx.textAlign = 'center';
-        ctx.fillText('遊戲結束！', W / 2, H / 2);
-      }
-    }
+  // Combo 特效
+  if (comboFlash) {
+    ctx.fillStyle = '#ff78b5';
+    ctx.font = 'bold 36px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(comboFlash, W / 2, H / 2 - 100);
+  }
+
+  // 遊戲結束提示
+  if (!running && chart.every(n => n.hit)) {
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold 36px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('遊戲結束！', W / 2, H / 2);
+  }
+}
+          
 
     function loop(ts) {
       const t = (ts - startTime) / 1000;
@@ -262,4 +289,3 @@
   </script>
 </body>
 </html>
-
