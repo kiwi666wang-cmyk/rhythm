@@ -1,4 +1,5 @@
 
+
 <!DOCTYPE html>
 <html lang="zh-Hant">
 <head>
@@ -63,6 +64,9 @@
     #menuScreen {
       padding-top: 200px;
     }
+    #endScreen {
+      padding-top: 150px;
+    }
     @media (max-width: 600px) {
       .hitkey {
         width: 70px;
@@ -77,12 +81,14 @@
   </style>
 </head>
 <body>
+  <!-- 主選單 -->
   <div id="menuScreen">
     <h1>🎵 DFJK 高難度節奏遊戲</h1>
     <button onclick="startGame()">開始遊戲</button>
     <button onclick="showOptions()">選項</button>
   </div>
 
+  <!-- 遊戲畫面 -->
   <div id="gameScreen" style="display:none;">
     <canvas id="gameCanvas" width="480" height="720"></canvas>
     <div class="hitbar">
@@ -98,6 +104,15 @@
     </div>
   </div>
 
+  <!-- 結束畫面 -->
+  <div id="endScreen" style="display: none;">
+    <h2>🎮 遊戲結束！</h2>
+    <p>分數：<span id="finalScore">0</span></p>
+    <button onclick="startGame()">再玩一次</button>
+    <button onclick="goToMenu()">回主選單</button>
+  </div>
+
+  <!-- 音效 -->
   <audio id="hitSound" src="https://cdn.pixabay.com/download/audio/2022/03/15/audio_6e3e3b6f3f.mp3?filename=click-124467.mp3"></audio>
   <audio id="bgm" src="https://cdn.pixabay.com/download/audio/2022/03/15/audio_3f9f3f3f3f.mp3?filename=8-bit-adventure-123456.mp3" loop></audio>
 
@@ -205,9 +220,9 @@
         const near = Math.abs(dtMs) <= 150 && Math.abs(n.y - judgeLineY) < 50;
         const laneKey = keys[n.lane];
         if (near && keyDown.has(laneKey)) {
-                    judge(dtMs, laneKey);
+          judge(dtMs, laneKey);
           keyDown.delete(laneKey);
-          n.hit = true;
+                    n.hit = true;
         }
         if (!n.hit && t - n.t > 0.2) {
           miss();
@@ -252,12 +267,11 @@
         ctx.fillText(comboFlash, W / 2, H / 2 - 100);
       }
 
-      // 遊戲結束提示
+      // 遊戲結束判定
       if (!running && chart.every(n => n.hit)) {
-        ctx.fillStyle = '#fff';
-        ctx.font = 'bold 36px sans-serif';
-        ctx.textAlign = 'center';
-        ctx.fillText('遊戲結束！', W / 2, H / 2);
+        document.getElementById('gameScreen').style.display = 'none';
+        document.getElementById('endScreen').style.display = 'block';
+        document.getElementById('finalScore').textContent = score;
       }
     }
 
@@ -277,6 +291,8 @@
     function startGame() {
       document.getElementById('menuScreen').style.display = 'none';
       document.getElementById('gameScreen').style.display = 'block';
+      document.getElementById('endScreen').style.display = 'none';
+
       score = 0;
       combo = 0;
       lastJudgementText = '-';
@@ -290,15 +306,24 @@
       requestAnimationFrame(loop);
     }
 
+    function goToMenu() {
+      document.getElementById('endScreen').style.display = 'none';
+      document.getElementById('gameScreen').style.display = 'none';
+      document.getElementById('menuScreen').style.display = 'block';
+      bgm.pause();
+    }
+
     function showOptions() {
       alert("選項功能尚未開放，敬請期待！");
     }
+
     document.addEventListener("contextmenu", function(e) {
       e.preventDefault();
     });
   </script>
 </body>
 </html>
+
 
 
 
