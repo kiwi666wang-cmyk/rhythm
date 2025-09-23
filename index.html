@@ -1,5 +1,3 @@
-
-
 <!DOCTYPE html>
 <html lang="zh-Hant">
 <head>
@@ -34,12 +32,12 @@
     .hitkey {
       position: absolute;
       bottom: 0;
-      width: 60px;
-      height: 60px;
+      width: 90px;
+      height: 90px;
       background: #2a2e4a;
       border: 4px solid #78d5ff;
       border-radius: 50%;
-      font-size: 20px;
+      font-size: 28px;
       color: #fff;
       font-weight: bold;
       display: flex;
@@ -61,17 +59,14 @@
       border-radius: 8px;
       cursor: pointer;
     }
-    #menuScreen {
-      padding-top: 200px;
-    }
-    #endScreen {
+    #menuScreen, #endScreen {
       padding-top: 150px;
     }
     @media (max-width: 600px) {
       .hitkey {
-        width: 70px;
-        height: 70px;
-        font-size: 24px;
+        width: 100px;
+        height: 100px;
+        font-size: 32px;
       }
       .hitbar {
         width: 100%;
@@ -92,10 +87,10 @@
   <div id="gameScreen" style="display:none;">
     <canvas id="gameCanvas" width="480" height="720"></canvas>
     <div class="hitbar">
-      <div class="hitkey" id="key-d" style="left:30px;">D</div>
-      <div class="hitkey" id="key-f" style="left:150px;">F</div>
-      <div class="hitkey" id="key-j" style="left:270px;">J</div>
-      <div class="hitkey" id="key-k" style="left:390px;">K</div>
+      <div class="hitkey" id="key-d" style="left:5px;">D</div>
+      <div class="hitkey" id="key-f" style="left:125px;">F</div>
+      <div class="hitkey" id="key-j" style="left:245px;">J</div>
+      <div class="hitkey" id="key-k" style="left:365px;">K</div>
     </div>
     <div class="hud">
       分數：<span id="score">0</span>　
@@ -117,8 +112,6 @@
   <audio id="bgm" src="https://cdn.pixabay.com/download/audio/2022/03/15/audio_3f9f3f3f3f.mp3?filename=8-bit-adventure-123456.mp3" loop></audio>
 
   <script>
-    window.addEventListener('contextmenu', e => e.preventDefault());
-
     const canvas = document.getElementById('gameCanvas');
     const ctx = canvas.getContext('2d');
     const W = canvas.width, H = canvas.height;
@@ -134,7 +127,6 @@
     const bgm = document.getElementById('bgm');
 
     window.addEventListener('keydown', e => {
-      e.preventDefault();
       const k = e.key.toLowerCase();
       if (keys.includes(k)) keyDown.add(k);
     });
@@ -148,6 +140,7 @@
       el.addEventListener('touchstart', () => handleTouch(k));
       el.addEventListener('click', () => handleTouch(k));
     });
+
     function handleTouch(k) {
       keyDown.add(k);
       setTimeout(() => keyDown.delete(k), 100);
@@ -217,12 +210,12 @@
       chart.forEach(n => {
         if (n.hit) return;
         const dtMs = (t - n.t) * 1000;
-        const near = Math.abs(dtMs) <= 150 && Math.abs(n.y - judgeLineY) < 50;
+        const near = Math.abs(dtMs) <= 150 && Math.abs(n.y - judgeLineY) < 75;
         const laneKey = keys[n.lane];
         if (near && keyDown.has(laneKey)) {
-          judge(dtMs, laneKey);
+                    judge(dtMs, laneKey);
           keyDown.delete(laneKey);
-                    n.hit = true;
+          n.hit = true;
         }
         if (!n.hit && t - n.t > 0.2) {
           miss();
@@ -247,7 +240,7 @@
         const x = n.lane * laneWidth + laneWidth / 2;
         ctx.fillStyle = '#78d5ff';
         ctx.beginPath();
-        ctx.arc(x, n.y, 20, 0, Math.PI * 2);
+        ctx.arc(x, n.y, 30, 0, Math.PI * 2); // 放大音符半徑 30px
         ctx.fill();
       });
 
@@ -267,7 +260,7 @@
         ctx.fillText(comboFlash, W / 2, H / 2 - 100);
       }
 
-      // 遊戲結束判定
+      // 遊戲結束提示
       if (!running && chart.every(n => n.hit)) {
         document.getElementById('gameScreen').style.display = 'none';
         document.getElementById('endScreen').style.display = 'block';
@@ -323,6 +316,9 @@
   </script>
 </body>
 </html>
+
+
+
 
 
 
