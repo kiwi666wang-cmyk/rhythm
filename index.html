@@ -1,7 +1,9 @@
+
 <!DOCTYPE html>
 <html lang="zh-Hant">
 <head>
   <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>DFJK 高難度節奏遊戲</title>
   <style>
     body {
@@ -10,6 +12,7 @@
       color: #fff;
       font-family: sans-serif;
       text-align: center;
+      touch-action: manipulation;
     }
     canvas {
       display: block;
@@ -96,7 +99,6 @@
   </div>
 
   <audio id="hitSound" src="https://cdn.pixabay.com/download/audio/2022/03/15/audio_6e3e3b6f3f.mp3?filename=click-124467.mp3"></audio>
-
   <script>
     const canvas = document.getElementById('gameCanvas');
     const ctx = canvas.getContext('2d');
@@ -211,50 +213,49 @@
     }
 
     function render() {
-  ctx.clearRect(0, 0, W, H);
+      ctx.clearRect(0, 0, W, H);
 
-  // 判定線
-  ctx.strokeStyle = '#fff';
-  ctx.beginPath();
-  ctx.moveTo(0, judgeLineY);
-  ctx.lineTo(W, judgeLineY);
-  ctx.stroke();
+      // 判定線
+      ctx.strokeStyle = '#fff';
+      ctx.beginPath();
+      ctx.moveTo(0, judgeLineY);
+      ctx.lineTo(W, judgeLineY);
+      ctx.stroke();
 
-  // 音符
-  chart.forEach(n => {
-    if (n.hit) return;
-    const x = n.lane * laneWidth + laneWidth / 2;
-    ctx.fillStyle = '#78d5ff';
-    ctx.beginPath();
-    ctx.arc(x, n.y, 20, 0, Math.PI * 2);
-    ctx.fill();
-  });
+      // 音符
+      chart.forEach(n => {
+        if (n.hit) return;
+        const x = n.lane * laneWidth + laneWidth / 2;
+        ctx.fillStyle = '#78d5ff';
+        ctx.beginPath();
+        ctx.arc(x, n.y, 20, 0, Math.PI * 2);
+        ctx.fill();
+      });
 
-  // 判定文字
-  if (lastJudgementText !== '-') {
-    ctx.fillStyle = '#fff';
-    ctx.font = 'bold 32px sans-serif';
-    ctx.textAlign = 'center';
-    ctx.fillText(lastJudgementText, W / 2, judgeLineY - 40);
-  }
+      // 判定文字
+      if (lastJudgementText !== '-') {
+        ctx.fillStyle = '#fff';
+        ctx.font = 'bold 32px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText(lastJudgementText, W / 2, judgeLineY - 40);
+      }
 
-  // Combo 特效
-  if (comboFlash) {
-    ctx.fillStyle = '#ff78b5';
-    ctx.font = 'bold 36px sans-serif';
-    ctx.textAlign = 'center';
-    ctx.fillText(comboFlash, W / 2, H / 2 - 100);
-  }
+      // Combo 特效
+      if (comboFlash) {
+        ctx.fillStyle = '#ff78b5';
+        ctx.font = 'bold 36px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText(comboFlash, W / 2, H / 2 - 100);
+      }
 
-  // 遊戲結束提示
-  if (!running && chart.every(n => n.hit)) {
-    ctx.fillStyle = '#fff';
-    ctx.font = 'bold 36px sans-serif';
-    ctx.textAlign = 'center';
-    ctx.fillText('遊戲結束！', W / 2, H / 2);
-  }
-}
-          
+      // 遊戲結束提示
+      if (!running && chart.every(n => n.hit)) {
+        ctx.fillStyle = '#fff';
+        ctx.font = 'bold 36px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('遊戲結束！', W / 2, H / 2);
+      }
+    }
 
     function loop(ts) {
       const t = (ts - startTime) / 1000;
@@ -289,5 +290,6 @@
   </script>
 </body>
 </html>
+
 
 
