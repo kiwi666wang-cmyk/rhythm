@@ -99,7 +99,11 @@
   </div>
 
   <audio id="hitSound" src="https://cdn.pixabay.com/download/audio/2022/03/15/audio_6e3e3b6f3f.mp3?filename=click-124467.mp3"></audio>
+  <audio id="bgm" src="https://cdn.pixabay.com/download/audio/2022/03/15/audio_3f9f3f3f3f.mp3?filename=8-bit-adventure-123456.mp3" loop></audio>
+
   <script>
+    window.addEventListener('contextmenu', e => e.preventDefault());
+
     const canvas = document.getElementById('gameCanvas');
     const ctx = canvas.getContext('2d');
     const W = canvas.width, H = canvas.height;
@@ -112,6 +116,7 @@
     let chart = [];
     let comboFlash = '';
     const hitSound = document.getElementById('hitSound');
+    const bgm = document.getElementById('bgm');
 
     window.addEventListener('keydown', e => {
       e.preventDefault();
@@ -123,7 +128,6 @@
       if (keys.includes(k)) keyDown.delete(k);
     });
 
-    // 📱 手機觸控支援
     keys.forEach(k => {
       const el = document.getElementById('key-' + k);
       el.addEventListener('touchstart', () => handleTouch(k));
@@ -201,7 +205,7 @@
         const near = Math.abs(dtMs) <= 150 && Math.abs(n.y - judgeLineY) < 50;
         const laneKey = keys[n.lane];
         if (near && keyDown.has(laneKey)) {
-          judge(dtMs, laneKey);
+                    judge(dtMs, laneKey);
           keyDown.delete(laneKey);
           n.hit = true;
         }
@@ -281,6 +285,8 @@
       updateHUD();
       startTime = performance.now();
       running = true;
+      bgm.currentTime = 0;
+      bgm.play();
       requestAnimationFrame(loop);
     }
 
@@ -290,6 +296,8 @@
   </script>
 </body>
 </html>
+
+
 
 
 
