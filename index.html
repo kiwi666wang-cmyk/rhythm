@@ -120,7 +120,7 @@
     const ctx = canvas.getContext('2d');
     const W = canvas.width, H = canvas.height;
     const laneWidth = W / 4;
-    const judgeLineY = H - 55; // 🔥 修正判定線位置，對齊 hitkey 中心
+    const judgeLineY = H - 60;
     const keys = ['d','f','j','k'];
     const keyDown = new Set();
     let score = 0, combo = 0, lastJudgementText = '-';
@@ -201,7 +201,7 @@
         lanes.forEach(lane => {
           chart.push({ t: time, lane, type: 'tap', hit: false, y: -50 });
         });
-        time += Math.random() * 0.25 + 0.2;
+                time += Math.random() * 0.25 + 0.2;
       }
     }
 
@@ -244,7 +244,7 @@
         const x = n.lane * laneWidth + laneWidth / 2;
         ctx.fillStyle = '#78d5ff';
         ctx.beginPath();
-        ctx.arc(x, n.y, 30, 0, Math.PI * 2); // 半徑30，和 hitkey 大小接近
+        ctx.arc(x, n.y, 30, 0, Math.PI * 2); // 放大音符半徑
         ctx.fill();
       });
 
@@ -319,7 +319,20 @@
     });
   </script>
 </body>
-</html>>
+</html>
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
