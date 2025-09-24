@@ -37,12 +37,12 @@
     .hitkey {
       position: absolute;
       bottom: 0;
-      width: 70px;
-      height: 70px;
+      width: 90px;   /* 放大按鍵 */
+      height: 90px;  /* 放大按鍵 */
       background: #2a2e4a;
       border: 4px solid #78d5ff;
       border-radius: 50%;
-      font-size: 24px;
+      font-size: 28px; /* 放大字體 */
       color: #fff;
       font-weight: bold;
       display: flex;
@@ -72,9 +72,9 @@
         transform: scale(0.85);
       }
       .hitkey {
-        width: 60px;
-        height: 60px;
-        font-size: 20px;
+        width: 80px;   /* 手機版按鍵放大 */
+        height: 80px;  /* 手機版按鍵放大 */
+        font-size: 24px; /* 字體放大 */
       }
       .hitbar {
         width: 100%;
@@ -129,7 +129,7 @@
     let comboFlash = '';
     const hitSound = document.getElementById('hitSound');
     const bgm = document.getElementById('bgm');
-    const noteSpeed = 550; // 音符下落速度，px/s
+    const noteSpeed = 550;
 
     window.addEventListener('keydown', e => {
       const k = e.key.toLowerCase();
@@ -208,8 +208,7 @@
 
     function update(t) {
       chart.forEach(n => {
-        const dist = (n.t - t) * noteSpeed;
-        n.y = judgeLineY - dist;
+        n.y = judgeLineY - (n.t - t) * noteSpeed;
       });
 
       chart.forEach(n => {
@@ -230,14 +229,12 @@
     function render() {
       ctx.clearRect(0, 0, W, H);
 
-      // 判定線
       ctx.strokeStyle = '#fff';
       ctx.beginPath();
       ctx.moveTo(0, judgeLineY);
       ctx.lineTo(W, judgeLineY);
       ctx.stroke();
 
-      // 音符
       chart.forEach(n => {
         if (n.hit) return;
         const x = n.lane * laneWidth + laneWidth / 2;
@@ -247,7 +244,6 @@
         ctx.fill();
       });
 
-      // 判定文字
       if (lastJudgementText !== '-') {
         ctx.fillStyle = '#fff';
         ctx.font = 'bold 32px sans-serif';
@@ -255,7 +251,6 @@
         ctx.fillText(lastJudgementText, W / 2, judgeLineY - 40);
       }
 
-      // Combo 特效
       if (comboFlash) {
         ctx.fillStyle = '#ff78b5';
         ctx.font = 'bold 36px sans-serif';
@@ -263,7 +258,6 @@
         ctx.fillText(comboFlash, W / 2, H / 2 - 100);
       }
 
-      // 遊戲結束提示
       if (!running && chart.every(n => n.hit)) {
         document.getElementById('gameScreen').style.display = 'none';
         document.getElementById('endScreen').style.display = 'block';
@@ -319,6 +313,7 @@
   </script>
 </body>
 </html>
+
 
 
 
