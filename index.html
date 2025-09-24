@@ -145,6 +145,7 @@
     const bgm = document.getElementById('bgm');
     let baseNoteSpeed = 550;
     let noteSpeed = baseNoteSpeed;
+    let lastTouchTime = {};
 
     window.addEventListener('keydown', e => {
       const k = e.key.toLowerCase();
@@ -157,14 +158,15 @@
 
     keys.forEach(k => {
       const el = document.getElementById('key-' + k);
-      el.addEventListener('touchstart', () => handleTouch(k));
-      el.addEventListener('click', () => handleTouch(k));
+      el.addEventListener('touchstart', e => {
+        e.preventDefault();
+        const now = Date.now();
+        if (lastTouchTime[k] && now - lastTouchTime[k] < 100) return;
+        lastTouchTime[k] = now;
+        keyDown.add(k);
+        setTimeout(() => keyDown.delete(k), 100);
+      }, { passive: false });
     });
-
-    function handleTouch(k) {
-      keyDown.add(k);
-      setTimeout(() => keyDown.delete(k), 100);
-    }
 
     function updateHUD() {
       document.getElementById('score').textContent = score;
@@ -191,7 +193,7 @@
       hitSound.currentTime = 0;
       hitSound.play();
       flashKey(laneKey);
-      if (combo % 10 === 0) {
+            if (combo % 10 === 0) {
         comboFlash = `COMBO x${combo}!!`;
         setTimeout(() => comboFlash = '', 800);
       }
@@ -203,7 +205,7 @@
       updateHUD();
     }
 
-        function generateChart() {
+    function generateChart() {
       chart = [];
       let time = 1;
       const endTime = Math.random() * 20 + 110;
@@ -267,11 +269,11 @@
       chart.forEach(n => {
         const laneKey = keys[n.lane];
         const dtMs = (t - n.t) * 1000;
-        if (!n.hit && Math.abs(dtMs) <= 150 && keyDown.has(laneKey)) {
+        if (!n.hit && Math.abs(dtMs) <= 200 && keyDown.has(laneKey)) {
           judge(dtMs, laneKey);
           keyDown.delete(laneKey);
           n.hit = true;
-        } else if (!n.hit && dtMs > 150) {
+        } else if (!n.hit && dtMs > 200) {
           miss();
           n.hit = true;
         }
@@ -383,7 +385,7 @@
     });
   </script>
 </body>
-</html
+</html>
 
 
 
@@ -394,6 +396,7 @@
 
 
  
+
 
 
 
