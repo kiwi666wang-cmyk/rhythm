@@ -129,6 +129,7 @@
     let comboFlash = '';
     const hitSound = document.getElementById('hitSound');
     const bgm = document.getElementById('bgm');
+    const noteSpeed = 550; // 音符下落速度，px/s
 
     window.addEventListener('keydown', e => {
       const k = e.key.toLowerCase();
@@ -201,27 +202,25 @@
         lanes.forEach(lane => {
           chart.push({ t: time, lane, type: 'tap', hit: false, y: -50 });
         });
-                time += Math.random() * 0.25 + 0.2;
+        time += Math.random() * 0.25 + 0.2;
       }
     }
 
     function update(t) {
       chart.forEach(n => {
-        const dist = (n.t - t) * 550;
+        const dist = (n.t - t) * noteSpeed;
         n.y = judgeLineY - dist;
       });
 
       chart.forEach(n => {
         if (n.hit) return;
         const dtMs = (t - n.t) * 1000;
-        const near = Math.abs(dtMs) <= 150 && Math.abs(n.y - judgeLineY) < 75;
         const laneKey = keys[n.lane];
-        if (near && keyDown.has(laneKey)) {
+        if (Math.abs(dtMs) <= 150 && keyDown.has(laneKey)) {
           judge(dtMs, laneKey);
           keyDown.delete(laneKey);
           n.hit = true;
-        }
-        if (!n.hit && t - n.t > 0.2) {
+        } else if (dtMs > 150) {
           miss();
           n.hit = true;
         }
@@ -244,7 +243,7 @@
         const x = n.lane * laneWidth + laneWidth / 2;
         ctx.fillStyle = '#78d5ff';
         ctx.beginPath();
-        ctx.arc(x, n.y, 30, 0, Math.PI * 2); // 放大音符半徑
+        ctx.arc(x, n.y, 30, 0, Math.PI * 2);
         ctx.fill();
       });
 
@@ -320,6 +319,7 @@
   </script>
 </body>
 </html>
+
 
 
 
