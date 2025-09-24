@@ -154,10 +154,11 @@
 
     function countCharacters() {
       const text = document.getElementById("inputText").value;
-      let chineseCount = 0, englishCount = 0, punctuationCount = 0;
+      let chineseCount = 0, englishCount = 0, punctuationCount = 0, digitCount = 0;
       for (let char of text) {
         if (/[\u4e00-\u9fff]/.test(char)) chineseCount++;
         else if (/[a-zA-Z]/.test(char)) englishCount++;
+        else if (/[0-9]/.test(char)) digitCount++;
         else if (/[\u3000-\u303F\u2000-\u206F\uFF00-\uFFEF.,!?;:()「」『』“”‘’]/.test(char)) punctuationCount++;
       }
       const total = text.length;
@@ -165,6 +166,7 @@
         總字元數：${total}<br>
         中文字：${chineseCount}<br>
         英文字母：${englishCount}<br>
+        阿拉伯數字：${digitCount}<br>
         標點符號：${punctuationCount}
       `;
     }
@@ -210,152 +212,156 @@
       document.getElementById('judgement').textContent = lastJudgementText;
     }
 
-        function flashKey(k) {
+    function flashKey(k) {
       const el = document.getElementById('key-' + k);
       if (!el) return;
       el.classList.add('flash');
-      setTimeout(() => el.classList.remove('flash'), 150);
-    }
+      setTimeout(() =>       el.classList.remove('flash');
+    }, 150);
+  }
 
-    function judge(dtMs, laneKey) {
-      let j = 'GOOD', add = 300;
-      const adt = Math.abs(dtMs);
-      if (adt <= 50) { j = 'PERFECT'; add = 1000; }
-      else if (adt <= 100) { j = 'GREAT'; add = 600; }
-      score += add;
-      combo += 1;
-      lastJudgementText = j;
-      updateHUD();
-      hitSound.currentTime = 0;
-      hitSound.play();
-      flashKey(laneKey);
-      if (combo % 10 === 0) {
-        comboFlash = `COMBO x${combo}!!`;
-        setTimeout(() => comboFlash = '', 800);
+  function judge(dtMs, laneKey) {
+    let j = 'GOOD', add = 300;
+    const adt = Math.abs(dtMs);
+    if (adt <= 50) { j = 'PERFECT'; add = 1000; }
+    else if (adt <= 100) { j = 'GREAT'; add = 600; }
+    score += add;
+    combo += 1;
+    lastJudgementText = j;
+    updateHUD();
+    hitSound.currentTime = 0;
+    hitSound.play();
+    flashKey(laneKey);
+    if (combo % 10 === 0) {
+      comboFlash = `COMBO x${combo}!!`;
+      setTimeout(() => comboFlash = '', 800);
+    }
+  }
+
+  function miss() {
+    lastJudgementText = 'MISS';
+    combo = 0;
+    updateHUD();
+  }
+
+  function generateChart() {
+    chart = [];
+    let time = 1;
+    const endTime = Math.random() * 20 + 110;
+    while (time < endTime) {
+      const count = Math.random() < 0.35 ? 2 : 1;
+      const lanes = [];
+      while (lanes.length < count) {
+        const lane = Math.floor(Math.random() * 4);
+        if (!lanes.includes(lane)) lanes.push(lane);
       }
-    }
-
-    function miss() {
-      lastJudgementText = 'MISS';
-      combo = 0;
-      updateHUD();
-    }
-
-    function generateChart() {
-      chart = [];
-      let time = 1;
-      const endTime = Math.random() * 20 + 110;
-      while (time < endTime) {
-        const count = Math.random() < 0.35 ? 2 : 1;
-        const lanes = [];
-        while (lanes.length < count) {
-          const lane = Math.floor(Math.random() * 4);
-          if (!lanes.includes(lane)) lanes.push(lane);
-        }
-        lanes.forEach(lane => {
-          chart.push({ t: time, lane, type: 'tap', hit: false, y: -50 });
-        });
-        time += Math.random() * 0.25 + 0.2;
-      }
-    }
-
-    function update(t) {
-      chart.forEach(n => {
-        n.y = judgeLineY - (n.t - t) * noteSpeed;
+      lanes.forEach(lane => {
+        chart.push({ t: time, lane, type: 'tap', hit: false, y: -50 });
       });
-
-      chart.forEach(n => {
-        if (n.hit) return;
-        const dtMs = (t - n.t) * 1000;
-        const laneKey = keys[n.lane];
-        if (Math.abs(dtMs) <= 150 && keyDown.has(laneKey)) {
-          judge(dtMs, laneKey);
-          keyDown.delete(laneKey);
-          n.hit = true;
-        } else if (dtMs > 150) {
-          miss();
-          n.hit = true;
-        }
-      });
+      time += Math.random() * 0.25 + 0.2;
     }
+  }
 
-    function render() {
-      ctx.clearRect(0, 0, W, H);
-
-      ctx.strokeStyle = '#fff';
-      ctx.beginPath();
-      ctx.moveTo(0, judgeLineY);
-      ctx.lineTo(W, judgeLineY);
-      ctx.stroke();
-
-      chart.forEach(n => {
-        if (n.hit) return;
-        const x = n.lane * laneWidth + laneWidth / 2;
-        ctx.fillStyle = '#78d5ff';
-        ctx.beginPath();
-        ctx.arc(x, n.y, 30, 0, Math.PI * 2);
-        ctx.fill();
-      });
-
-      if (lastJudgementText !== '-') {
-        ctx.fillStyle = '#fff';
-        ctx.font = 'bold 32px sans-serif';
-        ctx.textAlign = 'center';
-        ctx.fillText(lastJudgementText, W / 2, judgeLineY - 40);
-      }
-
-      if (comboFlash) {
-        ctx.fillStyle = '#ff78b5';
-        ctx.font = 'bold 36px sans-serif';
-        ctx.textAlign = 'center';
-        ctx.fillText(comboFlash, W / 2, H / 2 - 100);
-      }
-
-      if (!running && chart.every(n => n.hit)) {
-        document.getElementById('gameScreen').style.display = 'none';
-        document.getElementById('endScreen').style.display = 'block';
-        document.getElementById('finalScore').textContent = score;
-      }
-    }
-
-    function loop(ts) {
-      const t = (ts - startTime) / 1000;
-      update(t);
-      render();
-      if (chart.every(n => n.hit)) {
-        running = false;
-        lastJudgementText = 'END';
-        updateHUD();
-        return;
-      }
-      requestAnimationFrame(loop);
-    }
-
-    function startGame() {
-      score = 0;
-      combo = 0;
-      lastJudgementText = '-';
-      comboFlash = '';
-      generateChart();
-      updateHUD();
-      startTime = performance.now();
-      running = true;
-      bgm.currentTime = 0;
-      bgm.play();
-      requestAnimationFrame(loop);
-    }
-
-    document.addEventListener("contextmenu", function(e) {
-      e.preventDefault();
+  function update(t) {
+    chart.forEach(n => {
+      n.y = judgeLineY - (n.t - t) * noteSpeed;
     });
-  </script>
+
+    chart.forEach(n => {
+      if (n.hit) return;
+      const dtMs = (t - n.t) * 1000;
+      const laneKey = keys[n.lane];
+      if (Math.abs(dtMs) <= 150 && keyDown.has(laneKey)) {
+        judge(dtMs, laneKey);
+        keyDown.delete(laneKey);
+        n.hit = true;
+      } else if (dtMs > 150) {
+        miss();
+        n.hit = true;
+      }
+    });
+  }
+
+  function render() {
+    ctx.clearRect(0, 0, W, H);
+
+    ctx.strokeStyle = '#fff';
+    ctx.beginPath();
+    ctx.moveTo(0, judgeLineY);
+    ctx.lineTo(W, judgeLineY);
+    ctx.stroke();
+
+    chart.forEach(n => {
+      if (n.hit) return;
+      const x = n.lane * laneWidth + laneWidth / 2;
+      ctx.fillStyle = '#78d5ff';
+      ctx.beginPath();
+      ctx.arc(x, n.y, 30, 0, Math.PI * 2);
+      ctx.fill();
+    });
+
+    if (lastJudgementText !== '-') {
+      ctx.fillStyle = '#fff';
+      ctx.font = 'bold 32px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(lastJudgementText, W / 2, judgeLineY - 40);
+    }
+
+    if (comboFlash) {
+      ctx.fillStyle = '#ff78b5';
+      ctx.font = 'bold 36px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(comboFlash, W / 2, H / 2 - 100);
+    }
+
+    if (!running && chart.every(n => n.hit)) {
+      document.getElementById('gameScreen').style.display = 'none';
+      document.getElementById('endScreen').style.display = 'block';
+      document.getElementById('finalScore').textContent = score;
+    }
+  }
+
+  function loop(ts) {
+    const t = (ts - startTime) / 1000;
+    update(t);
+    render();
+    if (chart.every(n => n.hit)) {
+      running = false;
+      lastJudgementText = 'END';
+      updateHUD();
+      return;
+    }
+    requestAnimationFrame(loop);
+  }
+
+  function startGame() {
+    score = 0;
+    combo = 0;
+    lastJudgementText = '-';
+    comboFlash = '';
+    generateChart();
+    updateHUD();
+    startTime = performance.now();
+    running = true;
+    bgm.currentTime = 0;
+    bgm.play();
+    requestAnimationFrame(loop);
+  }
+
+  document.addEventListener("contextmenu", function(e) {
+    e.preventDefault();
+  });
+</script>
 </body>
 </html>
 
 
 
 
+
+
  
+
 
 
 
