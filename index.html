@@ -37,12 +37,12 @@
     .hitkey {
       position: absolute;
       bottom: 0;
-      width: 90px;   /* 放大按鍵 */
-      height: 90px;  /* 放大按鍵 */
+      width: 90px;
+      height: 90px;
       background: #2a2e4a;
       border: 4px solid #78d5ff;
       border-radius: 50%;
-      font-size: 28px; /* 放大字體 */
+      font-size: 28px;
       color: #fff;
       font-weight: bold;
       display: flex;
@@ -64,7 +64,7 @@
       border-radius: 8px;
       cursor: pointer;
     }
-    #menuScreen, #endScreen {
+    #menuScreen, #endScreen, #optionsScreen {
       padding-top: 150px;
     }
     @media (max-width: 600px) {
@@ -72,9 +72,9 @@
         transform: scale(0.85);
       }
       .hitkey {
-        width: 80px;   /* 手機版按鍵放大 */
-        height: 80px;  /* 手機版按鍵放大 */
-        font-size: 24px; /* 字體放大 */
+        width: 80px;
+        height: 80px;
+        font-size: 24px;
       }
       .hitbar {
         width: 100%;
@@ -88,6 +88,26 @@
     <h1>🎵 DFJK 高難度節奏遊戲</h1>
     <button onclick="startGame()">開始遊戲</button>
     <button onclick="showOptions()">選項</button>
+  </div>
+
+  <div id="optionsScreen" style="display:none;">
+    <h2>⚙️ 遊戲選項</h2>
+    <label for="speedMultiplier">速度倍率：</label>
+    <select id="speedMultiplier">
+      <option value="1">1.0x（原始）</option>
+      <option value="1.1">1.1x</option>
+      <option value="1.2">1.2x</option>
+      <option value="1.3">1.3x</option>
+    </select>
+    <br><br>
+    <label for="difficultySelect">難度：</label>
+    <select id="difficultySelect">
+      <option value="normal" selected>普通</option>
+      <option value="hard">困難</option>
+      <option value="hell">地獄</option>
+    </select>
+    <br><br>
+    <button onclick="goToMenu()">回主選單</button>
   </div>
 
   <div id="gameScreen" style="display:none;">
@@ -116,209 +136,232 @@
   <audio id="bgm" src="https://cdn.pixabay.com/download/audio/2022/03/15/audio_3f9f3f3f3f.mp3?filename=8-bit-adventure-123456.mp3" loop></audio>
 
   <script>
-  const canvas = document.getElementById('gameCanvas');
-  const ctx = canvas.getContext('2d');
-  const W = canvas.width, H = canvas.height;
-  const laneWidth = W / 4;
-  const judgeLineY = H - 60;
-  const keys = ['d','f','j','k'];
-  const keyDown = new Set();
-  let score = 0, combo = 0, lastJudgementText = '-';
-  let startTime = 0, running = false;
-  let chart = [];
-  let comboFlash = '';
-  let loopId = null;
-  const hitSound = document.getElementById('hitSound');
-  const bgm = document.getElementById('bgm');
-  const noteSpeed = 550;
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    const W = canvas.width, H = canvas.height;
+    const laneWidth = W / 4;
+    const judgeLineY = H - 60;
+    const keys = ['d','f','j','k'];
+    const keyDown = new Set();
+    let score = 0, combo = 0, lastJudgementText = '-';
+    let startTime = 0, running = false;
+    let chart = [];
+    let comboFlash = '';
+    let loopId = null;
+    const hitSound = document.getElementById('hitSound');
+    const bgm = document.getElementById('bgm');
+    let baseNoteSpeed = 550;
+    let noteSpeed = baseNoteSpeed;
 
-  window.addEventListener('keydown', e => {
-    const k = e.key.toLowerCase();
-    if (keys.includes(k)) keyDown.add(k);
-  });
-  window.addEventListener('keyup', e => {
-    const k = e.key.toLowerCase();
-    if (keys.includes(k)) keyDown.delete(k);
-  });
-
-  keys.forEach(k => {
-    const el = document.getElementById('key-' + k);
-    el.addEventListener('touchstart', () => handleTouch(k));
-    el.addEventListener('click', () => handleTouch(k));
-  });
-
-  function handleTouch(k) {
-    keyDown.add(k);
-    setTimeout(() => keyDown.delete(k), 100);
-  }
-
-  function updateHUD() {
-    document.getElementById('score').textContent = score;
-    document.getElementById('combo').textContent = combo;
-    document.getElementById('judgement').textContent = lastJudgementText;
-  }
-
-  function flashKey(k) {
-    const el = document.getElementById('key-' + k);
-    if (!el) return;
-    el.classList.add('flash');
-    setTimeout(() => el.classList.remove('flash'), 150);
-  }
-
-  function judge(dtMs, laneKey) {
-    let j = 'GOOD', add = 300;
-    const adt = Math.abs(dtMs);
-    if (adt <= 50) { j = 'PERFECT'; add = 1000; }
-    else if (adt <= 100) { j = 'GREAT'; add = 600; }
-    score += add;
-    combo += 1;
-    lastJudgementText = j;
-    updateHUD();
-    hitSound.currentTime = 0;
-    hitSound.play();
-    flashKey(laneKey);
-    if (combo % 10 === 0) {
-      comboFlash = `COMBO x${combo}!!`;
-      setTimeout(() => comboFlash = '', 800);
-    }
-  }
-
-  function miss() {
-    lastJudgementText = 'MISS';
-    combo = 0;
-    updateHUD();
-  }
-
-  function generateChart() {
-    chart = [];
-    let time = 1;
-    const endTime = Math.random() * 20 + 110;
-    while (time < endTime) {
-      const count = Math.random() < 0.35 ? 2 : 1;
-      const lanes = [];
-      while (lanes.length < count) {
-        const lane = Math.floor(Math.random() * 4);
-        if (!lanes.includes(lane)) lanes.push(lane);
-      }
-      lanes.forEach(lane => {
-        chart.push({ t: time, lane, type: 'tap', hit: false, y: -50 });
-      });
-      time += Math.random() * 0.25 + 0.2;
-    }
-  }
-
-  function update(t) {
-    chart.forEach(n => {
-      n.y = judgeLineY - (n.t - t) * noteSpeed;
+    window.addEventListener('keydown', e => {
+      const k = e.key.toLowerCase();
+      if (keys.includes(k)) keyDown.add(k);
+    });
+    window.addEventListener('keyup', e => {
+      const k = e.key.toLowerCase();
+      if (keys.includes(k)) keyDown.delete(k);
     });
 
-    chart.forEach(n => {
-      if (n.hit) return;
-      const dtMs = (t - n.t) * 1000;
-      const laneKey = keys[n.lane];
-      if (Math.abs(dtMs) <= 150 && keyDown.has(laneKey)) {
-        judge(dtMs, laneKey);
-        keyDown.delete(laneKey);
-        n.hit = true;
-      } else if (dtMs > 150) {
-        miss();
-        n.hit = true;
-      }
-    });
-  }
-
-  function render() {
-    ctx.clearRect(0, 0, W, H);
-
-    ctx.strokeStyle = '#fff';
-    ctx.beginPath();
-    ctx.moveTo(0, judgeLineY);
-    ctx.lineTo(W, judgeLineY);
-    ctx.stroke();
-
-    chart.forEach(n => {
-      if (n.hit) return;
-      const x = n.lane * laneWidth + laneWidth / 2;
-      ctx.fillStyle = '#78d5ff';
-      ctx.beginPath();
-      ctx.arc(x, n.y, 30, 0, Math.PI * 2);
-      ctx.fill();
+    keys.forEach(k => {
+      const el = document.getElementById('key-' + k);
+      el.addEventListener('touchstart', () => handleTouch(k));
+      el.addEventListener('click', () => handleTouch(k));
     });
 
-    if (lastJudgementText !== '-') {
-      ctx.fillStyle = '#fff';
-      ctx.font = 'bold 32px sans-serif';
-      ctx.textAlign = 'center';
-      ctx.fillText(lastJudgementText, W / 2, judgeLineY - 40);
+    function handleTouch(k) {
+      keyDown.add(k);
+      setTimeout(() => keyDown.delete(k), 100);
     }
 
-    if (comboFlash) {
-      ctx.fillStyle = '#ff78b5';
-      ctx.font = 'bold 36px sans-serif';
-      ctx.textAlign = 'center';
-      ctx.fillText(comboFlash, W / 2, H / 2 - 100);
+    function updateHUD() {
+      document.getElementById('score').textContent = score;
+      document.getElementById('combo').textContent = combo;
+      document.getElementById('judgement').textContent = lastJudgementText;
     }
 
-    if (!running && chart.every(n => n.hit)) {
-      document.getElementById('gameScreen').style.display = 'none';
-      document.getElementById('endScreen').style.display = 'block';
-      document.getElementById('finalScore').textContent = score;
+    function flashKey(k) {
+      const el = document.getElementById('key-' + k);
+      if (!el) return;
+      el.classList.add('flash');
+      setTimeout(() => el.classList.remove('flash'), 150);
     }
-  }
 
-  function loop(ts) {
-    const t = (ts - startTime) / 1000;
-    update(t);
-    render();
-    if (chart.every(n => n.hit)) {
-      running = false;
-      lastJudgementText = 'END';
+    function judge(dtMs, laneKey) {
+      let j = 'GOOD', add = 300;
+      const adt = Math.abs(dtMs);
+      if (adt <= 50) { j = 'PERFECT'; add = 1000; }
+      else if (adt <= 100) { j = 'GREAT'; add = 600; }
+      score += add;
+      combo += 1;
+      lastJudgementText = j;
       updateHUD();
-      return;
+      hitSound.currentTime = 0;
+      hitSound.play();
+      flashKey(laneKey);
+      if (combo % 10 === 0) {
+        comboFlash = `COMBO x${combo}!!`;
+        setTimeout(() => comboFlash = '', 800);
+      }
     }
-    loopId = requestAnimationFrame(loop);
-  }
 
-  function startGame() {
-    bgm.pause();
-    bgm.currentTime = 0;
-    cancelAnimationFrame(loopId);
+    function miss() {
+      lastJudgementText = 'MISS';
+      combo = 0;
+      updateHUD();
+    }
 
-    score = 0;
-    combo = 0;
-    lastJudgementText = '-';
-    comboFlash = '';
-    chart = [];
-    keyDown.clear();
+    function generateChart() {
+      chart = [];
+      let time = 1;
+      const endTime = Math.random() * 20 + 110;
 
-    updateHUD();
-    generateChart();
-    startTime = performance.now();
-    running = true;
+      const difficulty = document.getElementById('difficultySelect').value;
+            let doubleNoteChance = 0.35;
+      let timeGapMin = 0.2;
+      let timeGapMax = 0.45;
 
-    document.getElementById('menuScreen').style.display = 'none';
-    document.getElementById('gameScreen').style.display = 'block';
-    document.getElementById('endScreen').style.display = 'none';
+      if (difficulty === 'hard') {
+        doubleNoteChance = 0.6;
+        timeGapMin = 0.15;
+        timeGapMax = 0.35;
+      } else if (difficulty === 'hell') {
+        doubleNoteChance = 0.9;
+        timeGapMin = 0.1;
+        timeGapMax = 0.25;
+      }
 
-    bgm.play();
-    loopId = requestAnimationFrame(loop);
-  }
+      while (time < endTime) {
+        const count = Math.random() < doubleNoteChance ? 2 : 1;
+        const lanes = [];
+        while (lanes.length < count) {
+          const lane = Math.floor(Math.random() * 4);
+          if (!lanes.includes(lane)) lanes.push(lane);
+        }
+        lanes.forEach(lane => {
+          chart.push({ t: time, lane, type: 'tap', hit: false, y: -50 });
+        });
+        time += Math.random() * (timeGapMax - timeGapMin) + timeGapMin;
+      }
+    }
 
-  function goToMenu() {
-    document.getElementById('endScreen').style.display = 'none';
-    document.getElementById('gameScreen').style.display = 'none';
-    document.getElementById('menuScreen').style.display = 'block';
-    bgm.pause();
-  }
+    function update(t) {
+      chart.forEach(n => {
+        n.y = judgeLineY - (n.t - t) * noteSpeed;
+      });
 
-  function showOptions() {
-    alert("選項功能尚未開放，敬請期待！");
-  }
+      chart.forEach(n => {
+        if (n.hit) return;
+        const dtMs = (t - n.t) * 1000;
+        const laneKey = keys[n.lane];
+        if (Math.abs(dtMs) <= 150 && keyDown.has(laneKey)) {
+          judge(dtMs, laneKey);
+          keyDown.delete(laneKey);
+          n.hit = true;
+        } else if (dtMs > 150) {
+          miss();
+          n.hit = true;
+        }
+      });
+    }
 
-  document.addEventListener("contextmenu", function(e) {
-    e.preventDefault();
-  });
-</script>
+    function render() {
+      ctx.clearRect(0, 0, W, H);
+
+      ctx.strokeStyle = '#fff';
+      ctx.beginPath();
+      ctx.moveTo(0, judgeLineY);
+      ctx.lineTo(W, judgeLineY);
+      ctx.stroke();
+
+      chart.forEach(n => {
+        if (n.hit) return;
+        const x = n.lane * laneWidth + laneWidth / 2;
+        ctx.fillStyle = '#78d5ff';
+        ctx.beginPath();
+        ctx.arc(x, n.y, 30, 0, Math.PI * 2);
+        ctx.fill();
+      });
+
+      if (lastJudgementText !== '-') {
+        ctx.fillStyle = '#fff';
+        ctx.font = 'bold 32px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText(lastJudgementText, W / 2, judgeLineY - 40);
+      }
+
+      if (comboFlash) {
+        ctx.fillStyle = '#ff78b5';
+        ctx.font = 'bold 36px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText(comboFlash, W / 2, H / 2 - 100);
+      }
+
+      if (!running && chart.every(n => n.hit)) {
+        document.getElementById('gameScreen').style.display = 'none';
+        document.getElementById('endScreen').style.display = 'block';
+        document.getElementById('finalScore').textContent = score;
+      }
+    }
+
+    function loop(ts) {
+      const t = (ts - startTime) / 1000;
+      update(t);
+      render();
+      if (chart.every(n => n.hit)) {
+        running = false;
+        lastJudgementText = 'END';
+        updateHUD();
+        return;
+      }
+      loopId = requestAnimationFrame(loop);
+    }
+
+    function startGame() {
+      const multiplier = parseFloat(document.getElementById('speedMultiplier').value);
+      noteSpeed = baseNoteSpeed * multiplier;
+
+      bgm.pause();
+      bgm.currentTime = 0;
+      cancelAnimationFrame(loopId);
+
+      score = 0;
+      combo = 0;
+      lastJudgementText = '-';
+      comboFlash = '';
+      chart = [];
+      keyDown.clear();
+
+      updateHUD();
+      generateChart();
+      startTime = performance.now();
+      running = true;
+
+      document.getElementById('menuScreen').style.display = 'none';
+      document.getElementById('optionsScreen').style.display = 'none';
+      document.getElementById('gameScreen').style.display = 'block';
+      document.getElementById('endScreen').style.display = 'none';
+
+      bgm.play();
+      loopId = requestAnimationFrame(loop);
+    }
+
+    function goToMenu() {
+      document.getElementById('endScreen').style.display = 'none';
+      document.getElementById('gameScreen').style.display = 'none';
+      document.getElementById('optionsScreen').style.display = 'none';
+      document.getElementById('menuScreen').style.display = 'block';
+      bgm.pause();
+    }
+
+    function showOptions() {
+      document.getElementById('menuScreen').style.display = 'none';
+      document.getElementById('optionsScreen').style.display = 'block';
+    }
+
+    document.addEventListener("contextmenu", function(e) {
+      e.preventDefault();
+    });
+  </script>
 </body>
 </html>
 
@@ -330,6 +373,7 @@
 
 
  
+
 
 
 
