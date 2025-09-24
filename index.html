@@ -29,14 +29,14 @@
       margin-top: 10px;
     }
     .hitbar {
-      position: relative;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
       width: 420px;
       margin: -90px auto 40px;
       height: 90px;
     }
     .hitkey {
-      position: absolute;
-      bottom: 0;
       width: 90px;
       height: 90px;
       background: #2a2e4a;
@@ -93,10 +93,10 @@
   <div id="gameScreen" style="display:none;">
     <canvas id="gameCanvas" width="420" height="640"></canvas>
     <div class="hitbar">
-      <div class="hitkey" id="key-d" style="left:5px;">D</div>
-      <div class="hitkey" id="key-f" style="left:115px;">F</div>
-      <div class="hitkey" id="key-j" style="left:225px;">J</div>
-      <div class="hitkey" id="key-k" style="left:325px;">K</div> <!-- 修正位置 -->
+      <div class="hitkey" id="key-d">D</div>
+      <div class="hitkey" id="key-f">F</div>
+      <div class="hitkey" id="key-j">J</div>
+      <div class="hitkey" id="key-k">K</div>
     </div>
     <div class="hud">
       分數：<span id="score">0</span>　
@@ -226,7 +226,7 @@
       });
     }
 
-       function render() {
+        function render() {
       ctx.clearRect(0, 0, W, H);
 
       ctx.strokeStyle = '#fff';
@@ -313,7 +313,10 @@
   </script>
 </body>
 </html>
+
+
  
+
 
 
 
