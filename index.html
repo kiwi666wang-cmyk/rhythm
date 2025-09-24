@@ -2,7 +2,7 @@
 <html lang="zh-Hant">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>DFJK 節奏遊戲</title>
   <style>
     body {
@@ -12,8 +12,6 @@
       font-family: sans-serif;
       text-align: center;
       touch-action: manipulation;
-      transform: scale(0.95);
-      transform-origin: top center;
     }
     canvas {
       display: block;
@@ -23,20 +21,21 @@
       width: 95%;
       max-width: 420px;
       height: auto;
-      position: relative;
-      z-index: 1;
     }
     .hitbar {
-      position: relative;
-      width: 420px;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      width: 95%;
+      max-width: 420px;
       margin: -90px auto 40px;
       height: 90px;
+      position: relative;
       z-index: 2;
     }
     .hitkey {
-      position: absolute;
-      bottom: 0;
-      width: 90px;
+      flex: 1;
+      margin: 0 5px;
       height: 90px;
       border: 3px solid transparent;
       border-radius: 50%;
@@ -48,10 +47,10 @@
       justify-content: center;
       transition: transform 0.2s, box-shadow 0.2s;
     }
-    #key-d { color: #b266ff; border-color: #b266ff; }   /* 紫 ← */
-    #key-f { color: #66ccff; border-color: #66ccff; }   /* 淺藍 ↓ */
-    #key-j { color: #66ff66; border-color: #66ff66; }   /* 綠 ↑ */
-    #key-k { color: #ff6666; border-color: #ff6666; }   /* 紅 → */
+    #key-d { color: #b266ff; border-color: #b266ff; }
+    #key-f { color: #66ccff; border-color: #66ccff; }
+    #key-j { color: #66ff66; border-color: #66ff66; }
+    #key-k { color: #ff6666; border-color: #ff6666; }
     .hitkey.flash {
       transform: scale(1.4);
       box-shadow: 0 0 20px currentColor;
@@ -72,20 +71,6 @@
     }
     #menuScreen, #endScreen, #optionsScreen {
       padding-top: 150px;
-    }
-    @media (max-width: 600px) {
-      body {
-        transform: scale(0.85);
-      }
-      .hitkey {
-        width: 80px;
-        height: 80px;
-        font-size: 30px;
-      }
-      .hitbar {
-        width: 100%;
-        max-width: 420px;
-      }
     }
   </style>
 </head>
@@ -121,10 +106,10 @@
   <div id="gameScreen" style="display:none;">
     <canvas id="gameCanvas" width="420" height="640"></canvas>
     <div class="hitbar">
-      <div class="hitkey" id="key-d" style="left:5px;">←</div>
-      <div class="hitkey" id="key-f" style="left:115px;">↓</div>
-      <div class="hitkey" id="key-j" style="left:225px;">↑</div>
-      <div class="hitkey" id="key-k" style="left:335px;">→</div>
+      <div class="hitkey" id="key-d">←</div>
+      <div class="hitkey" id="key-f">↓</div>
+      <div class="hitkey" id="key-j">↑</div>
+      <div class="hitkey" id="key-k">→</div>
     </div>
     <div class="hud">
       分數：<span id="score">0</span>　
@@ -197,7 +182,7 @@
     function judge(dtMs, laneKey) {
       let j = 'GOOD', add = 300;
       const adt = Math.abs(dtMs);
-            if (adt <= 50) { j = 'PERFECT'; add = 1000; }
+      if (adt <= 50) { j = 'PERFECT'; add = 1000; }
       else if (adt <= 100) { j = 'GREAT'; add = 600; }
       score += add;
       combo += 1;
@@ -218,7 +203,7 @@
       updateHUD();
     }
 
-    function generateChart() {
+        function generateChart() {
       chart = [];
       let time = 1;
       const endTime = Math.random() * 20 + 110;
@@ -236,6 +221,10 @@
         doubleNoteChance = 0.2;
         timeGapMin = 0.25;
         timeGapMax = 0.5;
+      } else if (difficulty === 'normal') {
+        doubleNoteChance = 0.35;
+        timeGapMin = 0.2;
+        timeGapMax = 0.45;
       } else if (difficulty === 'hard') {
         doubleNoteChance = 0.6;
         timeGapMin = 0.15;
@@ -394,8 +383,7 @@
     });
   </script>
 </body>
-</html>
-
+</html
 
 
 
@@ -406,6 +394,7 @@
 
 
  
+
 
 
 
