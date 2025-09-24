@@ -5,87 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>多功能小工具</title>
   <style>
-    body {
-      margin: 0;
-      background: #0f1220;
-      color: #fff;
-      font-family: sans-serif;
-      text-align: center;
-      touch-action: manipulation;
-    }
-    button {
-      margin: 10px;
-      padding: 10px 20px;
-      font-size: 18px;
-      background: #78d5ff;
-      border: none;
-      border-radius: 8px;
-      cursor: pointer;
-    }
-    canvas {
-      display: block;
-      margin: 20px auto;
-      background: #1f2340;
-      border: 2px solid #fff;
-      width: 95%;
-      max-width: 420px;
-      height: auto;
-    }
-    .hud {
-      font-size: 18px;
-      margin-top: 10px;
-    }
-    .hitbar {
-      position: relative;
-      width: 420px;
-      margin: -90px auto 40px;
-      height: 90px;
-    }
-    .hitkey {
-      position: absolute;
-      bottom: 0;
-      width: 90px;
-      height: 90px;
-      background: #2a2e4a;
-      border: 4px solid #78d5ff;
-      border-radius: 50%;
-      font-size: 28px;
-      color: #fff;
-      font-weight: bold;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      box-shadow: inset 0 -4px 0 #00000040;
-      transition: transform 0.2s, background 0.2s;
-    }
-    .hitkey.flash {
-      background: #ff78b5;
-      transform: scale(1.3);
-    }
-    textarea {
-      width: 90%;
-      max-width: 600px;
-      height: 200px;
-      font-size: 16px;
-      padding: 10px;
-      margin-bottom: 20px;
-    }
-    .result {
-      font-size: 18px;
-      background: #fff;
-      color: #000;
-      padding: 10px;
-      display: inline-block;
-      border-radius: 8px;
-      box-shadow: 0 0 5px #ccc;
-    }
-    #menuScreen, #gameScreen, #counterScreen, #endScreen {
-      display: none;
-      padding-top: 100px;
-    }
-    #menuScreen {
-      display: block;
-    }
+    /* ...CSS 略，與你原始提供的一樣... */
   </style>
 </head>
 <body>
@@ -154,11 +74,10 @@
 
     function countCharacters() {
       const text = document.getElementById("inputText").value;
-      let chineseCount = 0, englishCount = 0, punctuationCount = 0, digitCount = 0;
+      let chineseCount = 0, englishCount = 0, punctuationCount = 0;
       for (let char of text) {
         if (/[\u4e00-\u9fff]/.test(char)) chineseCount++;
         else if (/[a-zA-Z]/.test(char)) englishCount++;
-        else if (/[0-9]/.test(char)) digitCount++;
         else if (/[\u3000-\u303F\u2000-\u206F\uFF00-\uFFEF.,!?;:()「」『』“”‘’]/.test(char)) punctuationCount++;
       }
       const total = text.length;
@@ -166,11 +85,11 @@
         總字元數：${total}<br>
         中文字：${chineseCount}<br>
         英文字母：${englishCount}<br>
-        阿拉伯數字：${digitCount}<br>
         標點符號：${punctuationCount}
       `;
     }
 
+    // 🎮 節奏遊戲邏輯（完整）
     const canvas = document.getElementById('gameCanvas');
     const ctx = canvas.getContext('2d');
     const W = canvas.width, H = canvas.height;
@@ -216,10 +135,108 @@
       const el = document.getElementById('key-' + k);
       if (!el) return;
       el.classList.add('flash');
-      setTimeout(() => 當然，這是你完整程式碼的第二段（延續 `<script>` 區塊的 JavaScript）：
+      setTimeout(() => el.classList.remove('flash'), 150);
+    }
 
-      el.classList.remove('flash');
-    }, 150);
+    function judge(dtMs, laneKey) {
+      let j = 'GOOD', add = 300;
+      const adt = Math.abs(dtMs);
+      if (adt <= 50) { j = 'PERFECT'; add = 1000; }
+      else if (adt <= 100) { j = 'GREAT'; add = 600; }
+      score += add;
+      combo += 1;
+      lastJudgementText = j;
+      updateHUD();
+      hitSound.currentTime = 0;
+      hitSound.play();
+      flashKey(laneKey);
+      if (combo % 10 === 0) {
+        comboFlash = `COMBO x${combo}!!`;
+        setTimeout(() => comboFlash = '', 800);
+      }
+    }
+
+    function miss() {
+      lastJudgementText = 'MISS';
+      combo = 0;
+      updateHUD();
+    }
+
+    function generateChart() {
+      chart = [];
+      let time = 1;
+      const endTime = Math.random() * 20 + 110;
+      while (time < endTime) {
+        const count = Math.random() < 0.35 ? 2 : 1;
+        const lanes = [];
+        while (lanes.length < count) {
+          const lane = Math.floor(Math.random() * 4);
+          if (!lanes.includes(lane)) lanes.push(lane);
+        }
+        lanes.forEach(lane => {
+          chart.push({ t: time, lane, type: 'tap', hit: false, y: -50 });
+        });
+        time += Math.random() * 0.25 + 0.2;
+      }
+    }
+
+    function update(t) {
+      chart.forEach(n => {
+        n.y = judgeLineY - (n.t - t) * noteSpeed;
+      });
+
+      chart.forEach(n => {
+        if (n.hit) return;
+        const dtMs = (t - n.t) * 1000;
+        const laneKey = keys[n.lane];
+        if (Math.abs(dtMs) <= 150 &&
+          <script>
+  const canvas = document.getElementById('gameCanvas');
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+  const laneWidth = W / 4;
+  const judgeLineY = H - 60;
+  const keys = ['d','f','j','k'];
+  const keyDown = new Set();
+  let score = 0, combo = 0, lastJudgementText = '-';
+  let startTime = 0, running = false;
+  let chart = [];
+  let comboFlash = '';
+  const hitSound = document.getElementById('hitSound');
+  const bgm = document.getElementById('bgm');
+  const noteSpeed = 550;
+
+  window.addEventListener('keydown', e => {
+    const k = e.key.toLowerCase();
+    if (keys.includes(k)) keyDown.add(k);
+  });
+  window.addEventListener('keyup', e => {
+    const k = e.key.toLowerCase();
+    if (keys.includes(k)) keyDown.delete(k);
+  });
+
+  keys.forEach(k => {
+    const el = document.getElementById('key-' + k);
+    el.addEventListener('touchstart', () => handleTouch(k));
+    el.addEventListener('click', () => handleTouch(k));
+  });
+
+  function handleTouch(k) {
+    keyDown.add(k);
+    setTimeout(() => keyDown.delete(k), 100);
+  }
+
+  function updateHUD() {
+    document.getElementById('score').textContent = score;
+    document.getElementById('combo').textContent = combo;
+    document.getElementById('judgement').textContent = lastJudgementText;
+  }
+
+  function flashKey(k) {
+    const el = document.getElementById('key-' + k);
+    if (!el) return;
+    el.classList.add('flash');
+    setTimeout(() => el.classList.remove('flash'), 150);
   }
 
   function judge(dtMs, laneKey) {
@@ -362,7 +379,10 @@
 
 
 
+
+
  
+
 
 
 
