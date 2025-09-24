@@ -92,19 +92,21 @@
 
   <div id="optionsScreen" style="display:none;">
     <h2>⚙️ 遊戲選項</h2>
-    <label for="speedMultiplier">速度倍率：</label>
-    <select id="speedMultiplier">
-      <option value="1">1.0x（原始）</option>
-      <option value="1.1">1.1x</option>
-      <option value="1.2">1.2x</option>
-      <option value="1.3">1.3x</option>
-    </select>
-    <br><br>
     <label for="difficultySelect">難度：</label>
     <select id="difficultySelect">
+      <option value="beginner">初學者</option>
+      <option value="easy">簡單</option>
       <option value="normal" selected>普通</option>
       <option value="hard">困難</option>
       <option value="hell">地獄</option>
+    </select>
+    <br><br>
+    <label for="speedMultiplier">速度倍率：</label>
+    <select id="speedMultiplier">
+      <option value="1">1.0x（標準）</option>
+      <option value="1.1">1.1x</option>
+      <option value="1.2">1.2x</option>
+      <option value="1.3">1.3x</option>
     </select>
     <br><br>
     <button onclick="goToMenu()">回主選單</button>
@@ -215,12 +217,20 @@
       let time = 1;
       const endTime = Math.random() * 20 + 110;
 
-      const difficulty = document.getElementById('difficultySelect').value;
-            let doubleNoteChance = 0.35;
+            const difficulty = document.getElementById('difficultySelect').value;
+      let doubleNoteChance = 0.35;
       let timeGapMin = 0.2;
       let timeGapMax = 0.45;
 
-      if (difficulty === 'hard') {
+      if (difficulty === 'beginner') {
+        doubleNoteChance = 0.05;
+        timeGapMin = 0.3;
+        timeGapMax = 0.6;
+      } else if (difficulty === 'easy') {
+        doubleNoteChance = 0.2;
+        timeGapMin = 0.25;
+        timeGapMax = 0.5;
+      } else if (difficulty === 'hard') {
         doubleNoteChance = 0.6;
         timeGapMin = 0.15;
         timeGapMax = 0.35;
@@ -317,7 +327,13 @@
     }
 
     function startGame() {
-      const multiplier = parseFloat(document.getElementById('speedMultiplier').value);
+      const difficulty = document.getElementById('difficultySelect').value;
+      const speedMultiplierSelect = document.getElementById('speedMultiplier');
+      let multiplier = parseFloat(speedMultiplierSelect.value);
+
+      if (difficulty === 'beginner') multiplier = 0.8;
+      else if (difficulty === 'easy') multiplier = 0.9;
+
       noteSpeed = baseNoteSpeed * multiplier;
 
       bgm.pause();
@@ -372,7 +388,9 @@
 
 
 
+
  
+
 
 
 
