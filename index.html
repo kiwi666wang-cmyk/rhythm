@@ -227,24 +227,24 @@ function generateChart() {
   let timeGapMax = 0.45;
 
   if (difficulty === 'beginner') {
-    holdNoteChance = 0.10;
+    holdNoteChance = 0.04;
     doubleNoteChance = 0.2;
     timeGapMin = 0.3;
     timeGapMax = 0.6;
   } else if (difficulty === 'easy') {
-    holdNoteChance = 0.10;
+    holdNoteChance = 0.04;
     doubleNoteChance = 0.2;
     timeGapMin = 0.25;
     timeGapMax = 0.5;
   } else if (difficulty === 'normal') {
-    holdNoteChance = 0.15;
+    holdNoteChance = 0.09;
   } else if (difficulty === 'hard') {
-    holdNoteChance = 0.20;
+    holdNoteChance = 0.14;
     doubleNoteChance = 0.6;
     timeGapMin = 0.15;
     timeGapMax = 0.35;
   } else if (difficulty === 'hell') {
-    holdNoteChance = 0.25;
+    holdNoteChance = 0.19;
     doubleNoteChance = 0.9;
     timeGapMin = 0.1;
     timeGapMax = 0.25;
@@ -265,7 +265,7 @@ function generateChart() {
             t: time,
             lane,
             type: 'hold',
-            duration: 1.5,
+            duration: 0.75,
             hit: false,
             held: false,
             released: false,
@@ -339,13 +339,15 @@ function render() {
   ctx.lineTo(W, judgeLineY);
   ctx.stroke();
 
+  const t = (performance.now() - startTime) / 1000;
+
   chart.forEach(n => {
     if (n.hit) return;
     const x = n.lane * laneWidth + laneWidth / 2;
 
     if (n.type === 'hold') {
-      const endY = judgeLineY - (n.t + n.duration - (performance.now() - startTime) / 1000) * noteSpeed;
-      const startY = judgeLineY - (n.t - (performance.now() - startTime) / 1000) * noteSpeed;
+      const endY = judgeLineY - (n.t + n.duration - t) * noteSpeed;
+      const startY = judgeLineY - (n.t - t) * noteSpeed;
       ctx.fillStyle = '#ff78b5';
       ctx.fillRect(x - 15, endY, 30, startY - endY);
       ctx.beginPath();
@@ -459,6 +461,7 @@ document.addEventListener("contextmenu", function(e) {
 
 
  
+
 
 
 
