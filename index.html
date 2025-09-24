@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>DFJK 高難度節奏遊戲</title>
+  <title>DFJK 節奏遊戲</title>
   <style>
     body {
       margin: 0;
@@ -38,22 +38,24 @@
       bottom: 0;
       width: 90px;
       height: 90px;
-      background: rgba(255, 255, 255, 0.1);
-      border: 4px solid #78d5ff;
+      border: 3px solid transparent;
       border-radius: 50%;
-      font-size: 28px;
-      color: #fff;
+      background: rgba(255, 255, 255, 0.05);
+      font-size: 36px;
       font-weight: bold;
       display: flex;
       align-items: center;
       justify-content: center;
-      transition: transform 0.2s, background 0.2s;
-      cursor: pointer;
-      z-index: 3;
+      transition: transform 0.2s, box-shadow 0.2s;
     }
+    #key-d { color: #b266ff; border-color: #b266ff; }   /* 紫 ← */
+    #key-f { color: #66ccff; border-color: #66ccff; }   /* 淺藍 ↓ */
+    #key-j { color: #66ff66; border-color: #66ff66; }   /* 綠 ↑ */
+    #key-k { color: #ff6666; border-color: #ff6666; }   /* 紅 → */
     .hitkey.flash {
-      background: rgba(255, 120, 181, 0.3);
-      transform: scale(1.3);
+      transform: scale(1.4);
+      box-shadow: 0 0 20px currentColor;
+      background: rgba(255, 255, 255, 0.2);
     }
     .hud {
       font-size: 18px;
@@ -78,7 +80,7 @@
       .hitkey {
         width: 80px;
         height: 80px;
-        font-size: 24px;
+        font-size: 30px;
       }
       .hitbar {
         width: 100%;
@@ -89,7 +91,7 @@
 </head>
 <body>
   <div id="menuScreen">
-    <h1>🎵 DFJK 高難度節奏遊戲</h1>
+    <h1>🎵 DFJK 節奏遊戲</h1>
     <button onclick="startGame()">開始遊戲</button>
     <button onclick="showOptions()">選項</button>
   </div>
@@ -119,10 +121,10 @@
   <div id="gameScreen" style="display:none;">
     <canvas id="gameCanvas" width="420" height="640"></canvas>
     <div class="hitbar">
-      <div class="hitkey" id="key-d" style="left:5px;">D</div>
-      <div class="hitkey" id="key-f" style="left:115px;">F</div>
-      <div class="hitkey" id="key-j" style="left:225px;">J</div>
-      <div class="hitkey" id="key-k" style="left:335px;">K</div>
+      <div class="hitkey" id="key-d" style="left:5px;">←</div>
+      <div class="hitkey" id="key-f" style="left:115px;">↓</div>
+      <div class="hitkey" id="key-j" style="left:225px;">↑</div>
+      <div class="hitkey" id="key-k" style="left:335px;">→</div>
     </div>
     <div class="hud">
       分數：<span id="score">0</span>　
@@ -195,7 +197,7 @@
     function judge(dtMs, laneKey) {
       let j = 'GOOD', add = 300;
       const adt = Math.abs(dtMs);
-      if (adt <= 50) { j = 'PERFECT'; add = 1000; }
+            if (adt <= 50) { j = 'PERFECT'; add = 1000; }
       else if (adt <= 100) { j = 'GREAT'; add = 600; }
       score += add;
       combo += 1;
@@ -209,6 +211,7 @@
         setTimeout(() => comboFlash = '', 800);
       }
     }
+
     function miss() {
       lastJudgementText = 'MISS';
       combo = 0;
@@ -226,7 +229,7 @@
       let timeGapMax = 0.45;
 
       if (difficulty === 'beginner') {
-        doubleNoteChance = 0.05;
+        doubleNoteChance = 0.2;
         timeGapMin = 0.3;
         timeGapMax = 0.6;
       } else if (difficulty === 'easy') {
@@ -244,15 +247,25 @@
       }
 
       while (time < endTime) {
+        const lanesUsed = new Set();
+        const notesThisFrame = [];
+
         const count = Math.random() < doubleNoteChance ? 2 : 1;
-        const lanes = [];
-        while (lanes.length < count) {
+        while (notesThisFrame.length < count) {
           const lane = Math.floor(Math.random() * 4);
-          if (!lanes.includes(lane)) lanes.push(lane);
+          if (!lanesUsed.has(lane)) {
+            lanesUsed.add(lane);
+            notesThisFrame.push({
+              t: time,
+              lane,
+              type: 'tap',
+              hit: false,
+              y: -50
+            });
+          }
         }
-        lanes.forEach(lane => {
-          chart.push({ t: time, lane, type: 'tap', hit: false, y: -50 });
-        });
+
+        chart.push(...notesThisFrame);
         time += Math.random() * (timeGapMax - timeGapMin) + timeGapMin;
       }
     }
@@ -263,14 +276,13 @@
       });
 
       chart.forEach(n => {
-        if (n.hit) return;
-        const dtMs = (t - n.t) * 1000;
         const laneKey = keys[n.lane];
-        if (Math.abs(dtMs) <= 150 && keyDown.has(laneKey)) {
+        const dtMs = (t - n.t) * 1000;
+        if (!n.hit && Math.abs(dtMs) <= 150 && keyDown.has(laneKey)) {
           judge(dtMs, laneKey);
           keyDown.delete(laneKey);
           n.hit = true;
-        } else if (dtMs > 150) {
+        } else if (!n.hit && dtMs > 150) {
           miss();
           n.hit = true;
         }
@@ -279,17 +291,17 @@
 
     function render() {
       ctx.clearRect(0, 0, W, H);
-
       ctx.strokeStyle = '#fff';
       ctx.beginPath();
       ctx.moveTo(0, judgeLineY);
       ctx.lineTo(W, judgeLineY);
       ctx.stroke();
 
+      const laneColors = ['#b266ff', '#66ccff', '#66ff66', '#ff6666'];
       chart.forEach(n => {
         if (n.hit) return;
         const x = n.lane * laneWidth + laneWidth / 2;
-        ctx.fillStyle = '#78d5ff';
+        ctx.fillStyle = laneColors[n.lane];
         ctx.beginPath();
         ctx.arc(x, n.y, 30, 0, Math.PI * 2);
         ctx.fill();
@@ -394,6 +406,7 @@
 
 
  
+
 
 
 
