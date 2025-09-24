@@ -29,20 +29,20 @@
       margin-top: 10px;
     }
     .hitbar {
-      display: flex;
-      justify-content: space-between;
-      align-items: flex-end;
+      position: relative;
       width: 420px;
       margin: -90px auto 40px;
       height: 90px;
     }
     .hitkey {
-      width: 90px;
-      height: 90px;
+      position: absolute;
+      bottom: 0;
+      width: 70px;
+      height: 70px;
       background: #2a2e4a;
       border: 4px solid #78d5ff;
       border-radius: 50%;
-      font-size: 28px;
+      font-size: 24px;
       color: #fff;
       font-weight: bold;
       display: flex;
@@ -72,9 +72,9 @@
         transform: scale(0.85);
       }
       .hitkey {
-        width: 80px;
-        height: 80px;
-        font-size: 24px;
+        width: 60px;
+        height: 60px;
+        font-size: 20px;
       }
       .hitbar {
         width: 100%;
@@ -93,10 +93,10 @@
   <div id="gameScreen" style="display:none;">
     <canvas id="gameCanvas" width="420" height="640"></canvas>
     <div class="hitbar">
-      <div class="hitkey" id="key-d">D</div>
-      <div class="hitkey" id="key-f">F</div>
-      <div class="hitkey" id="key-j">J</div>
-      <div class="hitkey" id="key-k">K</div>
+      <div class="hitkey" id="key-d" style="left:5px;">D</div>
+      <div class="hitkey" id="key-f" style="left:115px;">F</div>
+      <div class="hitkey" id="key-j" style="left:225px;">J</div>
+      <div class="hitkey" id="key-k" style="left:335px;">K</div>
     </div>
     <div class="hud">
       分數：<span id="score">0</span>　
@@ -129,7 +129,6 @@
     let comboFlash = '';
     const hitSound = document.getElementById('hitSound');
     const bgm = document.getElementById('bgm');
-    const noteSpeed = 550;
 
     window.addEventListener('keydown', e => {
       const k = e.key.toLowerCase();
@@ -202,48 +201,54 @@
         lanes.forEach(lane => {
           chart.push({ t: time, lane, type: 'tap', hit: false, y: -50 });
         });
-        time += Math.random() * 0.25 + 0.2;
+                time += Math.random() * 0.25 + 0.2;
       }
     }
 
     function update(t) {
       chart.forEach(n => {
-        n.y = judgeLineY - (n.t - t) * noteSpeed;
+        const dist = (n.t - t) * 550;
+        n.y = judgeLineY - dist;
       });
 
       chart.forEach(n => {
         if (n.hit) return;
         const dtMs = (t - n.t) * 1000;
+        const near = Math.abs(dtMs) <= 150 && Math.abs(n.y - judgeLineY) < 75;
         const laneKey = keys[n.lane];
-        if (Math.abs(dtMs) <= 150 && keyDown.has(laneKey)) {
+        if (near && keyDown.has(laneKey)) {
           judge(dtMs, laneKey);
           keyDown.delete(laneKey);
           n.hit = true;
-        } else if (dtMs > 150) {
+        }
+        if (!n.hit && t - n.t > 0.2) {
           miss();
           n.hit = true;
         }
       });
     }
 
-        function render() {
+    function render() {
       ctx.clearRect(0, 0, W, H);
 
+      // 判定線
       ctx.strokeStyle = '#fff';
       ctx.beginPath();
       ctx.moveTo(0, judgeLineY);
       ctx.lineTo(W, judgeLineY);
       ctx.stroke();
 
+      // 音符
       chart.forEach(n => {
         if (n.hit) return;
         const x = n.lane * laneWidth + laneWidth / 2;
         ctx.fillStyle = '#78d5ff';
         ctx.beginPath();
-        ctx.arc(x, n.y, 30, 0, Math.PI * 2);
+        ctx.arc(x, n.y, 30, 0, Math.PI * 2); // 放大音符半徑
         ctx.fill();
       });
 
+      // 判定文字
       if (lastJudgementText !== '-') {
         ctx.fillStyle = '#fff';
         ctx.font = 'bold 32px sans-serif';
@@ -251,6 +256,7 @@
         ctx.fillText(lastJudgementText, W / 2, judgeLineY - 40);
       }
 
+      // Combo 特效
       if (comboFlash) {
         ctx.fillStyle = '#ff78b5';
         ctx.font = 'bold 36px sans-serif';
@@ -258,6 +264,7 @@
         ctx.fillText(comboFlash, W / 2, H / 2 - 100);
       }
 
+      // 遊戲結束提示
       if (!running && chart.every(n => n.hit)) {
         document.getElementById('gameScreen').style.display = 'none';
         document.getElementById('endScreen').style.display = 'block';
@@ -316,6 +323,7 @@
 
 
  
+
 
 
 
