@@ -188,7 +188,10 @@ let noteSpeed = baseNoteSpeed;
 window.addEventListener('keydown', e => {
   const k = e.key.toLowerCase();
   if (keys.includes(k)) keyDown.add(k);
-  if (e.key === 'Escape') pauseGame();
+  if (e.key === 'Escape') {
+    if (paused) resumeGame();
+    else pauseGame();
+  }
 });
 window.addEventListener('keyup', e => {
   const k = e.key.toLowerCase();
@@ -411,7 +414,7 @@ function startGame() {
   chart = [];
   keyDown.clear();
   paused = false;
-  running = true; // ✅ 修復暫停鍵失效
+  running = true;
 
   updateHUD();
   generateChart();
@@ -441,12 +444,15 @@ function pauseGame() {
 function resumeGame() {
   if (!paused) return;
   paused = false;
-  startTime = performance.now() - (chart[0].t * 1000);
   document.getElementById('pauseScreen').style.display = 'none';
   document.getElementById('gameScreen').style.display = 'block';
   document.getElementById('gameScreen').classList.remove('blur');
-  bgm.play();
-  loopId = requestAnimationFrame(loop);
+
+  showCountdown(() => {
+    startTime = performance.now() - (chart[0].t * 1000);
+    bgm.play();
+    loopId = requestAnimationFrame(loop);
+  });
 }
 
 function goToMenu() {
@@ -477,8 +483,8 @@ document.addEventListener("contextmenu", function(e) {
 
 
 
-
  
+
 
 
 
