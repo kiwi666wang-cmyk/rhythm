@@ -301,43 +301,57 @@ function generateChart() {
   }
 }
 
+// 遊戲邏輯
 function update(t) {
   chart.forEach(n => {
+    // 更新音符 y 座標
     n.y = judgeLineY - (n.t - t) * noteSpeed;
-  });
 
-  chart.forEach(n => {
     const laneKey = keys[n.lane];
-    const dtMs = (t - n.t) * 1000;
-    if (!n.hit && Math.abs(dtMs) <= 200 && keyDown.has(laneKey)) {
-      judge(dtMs, laneKey);
-      keyDown.delete(laneKey);
+    const dy = n.y - judgeLineY;
+
+    // 命中判定：音符還沒被擊中 & 對應按鍵被按 & 在圓圈範圍內
+    if (!n.hit && keyDown.has(laneKey) && Math.abs(dy) <= noteRadius) {
+      judge(dy, laneKey);
       n.hit = true;
-    } else if (!n.hit && dtMs > 200) {
+      keyDown.delete(laneKey);
+    }
+    // 防亂打：按鍵但沒擊中，不加分，閃光
+    else if (!n.hit && keyDown.has(laneKey)) {
+      flashKey(laneKey);
+      keyDown.delete(laneKey);
+    }
+    // MISS 判定：音符已經過判定線且沒被擊中
+    if (!n.hit && n.y - noteRadius > judgeLineY) {
       miss();
       n.hit = true;
     }
   });
 }
 
+// 渲染遊戲畫面
 function render() {
   ctx.clearRect(0, 0, W, H);
+
+  // 畫判定線
   ctx.strokeStyle = '#fff';
   ctx.beginPath();
   ctx.moveTo(0, judgeLineY);
   ctx.lineTo(W, judgeLineY);
   ctx.stroke();
 
+  // 畫音符
   const laneColors = ['#b266ff', '#66ccff', '#66ff66', '#ff6666'];
   chart.forEach(n => {
     if (n.hit) return;
     const x = n.lane * laneWidth + laneWidth / 2;
     ctx.fillStyle = laneColors[n.lane];
     ctx.beginPath();
-    ctx.arc(x, n.y, 30, 0, Math.PI * 2);
+    ctx.arc(x, n.y, noteRadius, 0, Math.PI * 2);
     ctx.fill();
   });
 
+  // 判定文字
   if (lastJudgementText !== '-') {
     ctx.fillStyle = '#fff';
     ctx.font = 'bold 32px sans-serif';
@@ -345,6 +359,7 @@ function render() {
     ctx.fillText(lastJudgementText, W / 2, judgeLineY - 40);
   }
 
+  // 連擊文字
   if (comboFlash) {
     ctx.fillStyle = '#ff78b5';
     ctx.font = 'bold 36px sans-serif';
@@ -352,6 +367,7 @@ function render() {
     ctx.fillText(comboFlash, W / 2, H / 2 - 100);
   }
 
+  // 遊戲結束
   if (!running && chart.every(n => n.hit)) {
     document.getElementById('gameScreen').style.display = 'none';
     document.getElementById('endScreen').style.display = 'block';
@@ -359,6 +375,7 @@ function render() {
   }
 }
 
+// 遊戲主迴圈
 function loop(ts) {
   if (paused) return;
   const t = (ts - startTime) / 1000;
@@ -373,6 +390,7 @@ function loop(ts) {
   loopId = requestAnimationFrame(loop);
 }
 
+// 顯示倒數
 function showCountdown(callback) {
   const countdownText = document.getElementById('countdownText');
   const steps = ['Ready', '3', '2', '1', 'Go!'];
@@ -387,7 +405,7 @@ function showCountdown(callback) {
     countdownText.textContent = steps[i];
     countdownText.style.display = 'block';
     countdownText.classList.remove('countdown');
-    void countdownText.offsetWidth;
+    void countdownText.offsetWidth; // 強制重繪以觸發動畫
     countdownText.classList.add('countdown');
     i++;
     setTimeout(nextStep, 700);
@@ -396,6 +414,7 @@ function showCountdown(callback) {
   nextStep();
 }
 
+// 開始遊戲
 function startGame() {
   const difficulty = document.getElementById('difficultySelect').value;
   const speedMultiplierSelect = document.getElementById('speedMultiplier');
@@ -416,7 +435,7 @@ function startGame() {
   keyDown.clear();
   paused = false;
   running = true;
-  elapsedBeforePause = 0; // 重設暫停時間紀錄
+  elapsedBeforePause = 0;
 
   updateHUD();
   generateChart();
@@ -433,20 +452,19 @@ function startGame() {
   });
 }
 
+// 暫停遊戲
 function pauseGame() {
   if (!running || paused) return;
   paused = true;
   bgm.pause();
   cancelAnimationFrame(loopId);
-
-  // 記錄暫停時的經過時間
   elapsedBeforePause = performance.now() - startTime;
-
   document.getElementById('gameScreen').classList.add('blur');
   document.getElementById('gameScreen').style.display = 'none';
   document.getElementById('pauseScreen').style.display = 'block';
 }
 
+// 恢復遊戲
 function resumeGame() {
   if (!paused) return;
   paused = false;
@@ -455,13 +473,13 @@ function resumeGame() {
   document.getElementById('gameScreen').classList.remove('blur');
 
   showCountdown(() => {
-    // 從暫停前的進度繼續
     startTime = performance.now() - elapsedBeforePause;
     bgm.play();
     loopId = requestAnimationFrame(loop);
   });
 }
 
+// 回主選單
 function goToMenu() {
   document.getElementById('endScreen').style.display = 'none';
   document.getElementById('gameScreen').style.display = 'none';
@@ -472,17 +490,20 @@ function goToMenu() {
   bgm.pause();
 }
 
+// 顯示選項
 function showOptions() {
   document.getElementById('menuScreen').style.display = 'none';
   document.getElementById('optionsScreen').style.display = 'block';
 }
 
-document.addEventListener("contextmenu", function(e) {
+// 禁止右鍵
+document.addEventListener("contextmenu", function(e){
   e.preventDefault();
 });
 </script>
 </body>
 </html>
+
 
 
 
