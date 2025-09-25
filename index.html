@@ -1,342 +1,343 @@
 <!DOCTYPE html>
 <html lang="zh-Hant">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>DFJK 節奏遊戲</title>
-<link href="https://fonts.googleapis.com/css2?family=Fredoka+One&display=swap" rel="stylesheet">
-<style>
-body {
-  margin: 0;
-  background: #0f1220;
-  color: #fff;
-  font-family: sans-serif;
-  text-align: center;
-  touch-action: manipulation;
-}
-canvas {
-  display: block;
-  margin: 20px auto;
-  background: #1f2340;
-  border: 2px solid #fff;
-  width: 95%;
-  max-width: 420px;
-  height: auto;
-}
-.hitbar {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-end;
-  width: 95%;
-  max-width: 420px;
-  margin: -90px auto 40px;
-  height: 90px;
-  position: relative;
-  z-index: 2;
-}
-.hitkey {
-  flex: 1;
-  margin: 0 5px;
-  height: 90px;
-  border: 3px solid transparent;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.05);
-  font-size: 36px;
-  font-weight: bold;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: transform 0.2s, box-shadow 0.2s;
-}
-#key-d { color: #b266ff; border-color: #b266ff; }
-#key-f { color: #66ccff; border-color: #66ccff; }
-#key-j { color: #66ff66; border-color: #66ff66; }
-#key-k { color: #ff6666; border-color: #ff6666; }
-.hitkey.flash {
-  transform: scale(1.4);
-  box-shadow: 0 0 20px currentColor;
-  background: rgba(255, 255, 255, 0.2);
-}
-.hud {
-  font-size: 18px;
-  margin-top: 10px;
-}
-button {
-  margin: 10px;
-  padding: 10px 20px;
-  font-size: 18px;
-  background: #78d5ff;
-  border: none;
-  border-radius: 8px;
-  cursor: pointer;
-}
-#menuScreen, #endScreen, #optionsScreen, #pauseScreen {
-  padding-top: 150px;
-}
-.blur {
-  filter: blur(6px);
-  pointer-events: none;
-  user-select: none;
-}
-#pauseButton {
-  position: absolute;
-  top: 10px;
-  right: 10px;
-  z-index: 3;
-}
-.countdown {
-  position: absolute;
-  top: 40%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  font-family: 'Fredoka One', sans-serif;
-  font-size: 72px;
-  color: #fff;
-  text-shadow: 2px 2px 8px #000;
-  z-index: 5;
-  animation: pop 0.6s ease-out;
-}
-@keyframes pop {
-  0% { transform: scale(0.5) translate(-50%, -50%); opacity: 0; }
-  50% { transform: scale(1.2) translate(-50%, -50%); opacity: 1; }
-  100% { transform: scale(1) translate(-50%, -50%); opacity: 0; }
-}
-</style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DFJK 節奏遊戲</title>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka+One&display=swap" rel="stylesheet">
+  <style>
+    body {
+      margin: 0;
+      background: #0f1220;
+      color: #fff;
+      font-family: sans-serif;
+      text-align: center;
+      touch-action: manipulation;
+    }
+    canvas {
+      display: block;
+      margin: 20px auto;
+      background: #1f2340;
+      border: 2px solid #fff;
+      width: 95%;
+      max-width: 420px;
+      height: auto;
+    }
+    .hitbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      width: 95%;
+      max-width: 420px;
+      margin: -90px auto 40px;
+      height: 90px;
+      position: relative;
+      z-index: 2;
+    }
+    .hitkey {
+      flex: 1;
+      margin: 0 5px;
+      height: 90px;
+      border: 3px solid transparent;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.05);
+      font-size: 36px;
+      font-weight: bold;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+    #key-d { color: #b266ff; border-color: #b266ff; }
+    #key-f { color: #66ccff; border-color: #66ccff; }
+    #key-j { color: #66ff66; border-color: #66ff66; }
+    #key-k { color: #ff6666; border-color: #ff6666; }
+    .hitkey.flash {
+      transform: scale(1.4);
+      box-shadow: 0 0 20px currentColor;
+      background: rgba(255, 255, 255, 0.2);
+    }
+    .hud {
+      font-size: 18px;
+      margin-top: 10px;
+    }
+    button {
+      margin: 10px;
+      padding: 10px 20px;
+      font-size: 18px;
+      background: #78d5ff;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+    }
+    #menuScreen, #endScreen, #optionsScreen, #pauseScreen {
+      padding-top: 150px;
+    }
+    .blur {
+      filter: blur(6px);
+      pointer-events: none;
+      user-select: none;
+    }
+    #pauseButton {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      z-index: 3;
+    }
+    .countdown {
+      position: absolute;
+      top: 40%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      font-family: 'Fredoka One', sans-serif;
+      font-size: 72px;
+      color: #fff;
+      text-shadow: 2px 2px 8px #000;
+      z-index: 5;
+      animation: pop 0.6s ease-out;
+    }
+    @keyframes pop {
+      0% { transform: scale(0.5) translate(-50%, -50%); opacity: 0; }
+      50% { transform: scale(1.2) translate(-50%, -50%); opacity: 1; }
+      100% { transform: scale(1) translate(-50%, -50%); opacity: 0; }
+    }
+  </style>
 </head>
 <body>
+    <div id="menuScreen">
+    <h1>🎵 DFJK 節奏遊戲</h1>
+    <button onclick="startGame()">開始遊戲</button>
+    <button onclick="showOptions()">選項</button>
+  </div>
 
-<div id="menuScreen">
-<h1>🎵 DFJK 節奏遊戲</h1>
-<button onclick="startGame()">開始遊戲</button>
-<button onclick="showOptions()">選項</button>
-</div>
+  <div id="optionsScreen" style="display:none;">
+    <h2>⚙️ 遊戲選項</h2>
+    <label for="difficultySelect">難度：</label>
+    <select id="difficultySelect">
+      <option value="beginner">初學者</option>
+      <option value="easy">簡單</option>
+      <option value="normal" selected>普通</option>
+      <option value="hard">困難</option>
+      <option value="hell">地獄</option>
+    </select>
+    <br><br>
+    <label for="speedMultiplier">速度倍率：</label>
+    <select id="speedMultiplier">
+      <option value="1">1.0x（標準）</option>
+      <option value="1.1">1.1x</option>
+      <option value="1.2">1.2x</option>
+      <option value="1.3">1.3x</option>
+    </select>
+    <br><br>
+    <button onclick="goToMenu()">回主選單</button>
+  </div>
 
-<div id="optionsScreen" style="display:none;">
-<h2>⚙️ 遊戲選項</h2>
-<label for="difficultySelect">難度：</label>
-<select id="difficultySelect">
-  <option value="beginner">初學者</option>
-  <option value="easy">簡單</option>
-  <option value="normal" selected>普通</option>
-  <option value="hard">困難</option>
-  <option value="hell">地獄</option>
-</select>
-<br><br>
-<label for="speedMultiplier">速度倍率：</label>
-<select id="speedMultiplier">
-  <option value="1">1.0x（標準）</option>
-  <option value="1.1">1.1x</option>
-  <option value="1.2">1.2x</option>
-  <option value="1.3">1.3x</option>
-</select>
-<br><br>
-<button onclick="goToMenu()">回主選單</button>
-</div>
+  <div id="gameScreen" style="display:none;">
+    <button id="pauseButton" onclick="pauseGame()">⏸️</button>
+    <canvas id="gameCanvas" width="420" height="640"></canvas>
+    <div class="hitbar">
+      <div class="hitkey" id="key-d">←</div>
+      <div class="hitkey" id="key-f">↓</div>
+      <div class="hitkey" id="key-j">↑</div>
+      <div class="hitkey" id="key-k">→</div>
+    </div>
+    <div class="hud">
+      分數：<span id="score">0</span>　
+      連擊：<span id="combo">0</span>　
+      判定：<span id="judgement">-</span>
+    </div>
+  </div>
 
-<div id="gameScreen" style="display:none;">
-<button id="pauseButton" onclick="pauseGame()">⏸️</button>
-<canvas id="gameCanvas" width="420" height="640"></canvas>
-<div class="hitbar">
-  <div class="hitkey" id="key-d">←</div>
-  <div class="hitkey" id="key-f">↓</div>
-  <div class="hitkey" id="key-j">↑</div>
-  <div class="hitkey" id="key-k">→</div>
-</div>
-<div class="hud">
-分數：<span id="score">0</span>　
-連擊：<span id="combo">0</span>　
-判定：<span id="judgement">-</span>
-</div>
-</div>
+  <div id="pauseScreen" style="display:none;">
+    <h2>⏸️ 遊戲暫停</h2>
+    <button onclick="resumeGame()">▶️ 繼續</button>
+    <button onclick="goToMenu()">回主選單</button>
+  </div>
 
-<div id="pauseScreen" style="display:none;">
-<h2>⏸️ 遊戲暫停</h2>
-<button onclick="resumeGame()">▶️ 繼續</button>
-<button onclick="goToMenu()">回主選單</button>
-</div>
+  <div id="endScreen" style="display: none;">
+    <h2>🎮 遊戲結束！</h2>
+    <p>分數：<span id="finalScore">0</span></p>
+    <button onclick="startGame()">再玩一次</button>
+    <button onclick="goToMenu()">回主選單</button>
+  </div>
 
-<div id="endScreen" style="display:none;">
-<h2>🎮 遊戲結束！</h2>
-<p>分數：<span id="finalScore">0</span></p>
-<button onclick="startGame()">再玩一次</button>
-<button onclick="goToMenu()">回主選單</button>
-</div>
+  <div id="countdownText" class="countdown" style="display:none;"></div>
 
-<div id="countdownText" class="countdown" style="display:none;"></div>
-
-<audio id="hitSound" src="https://cdn.pixabay.com/download/audio/2022/03/15/audio_6e3e3b6f3f.mp3?filename=click-124467.mp3"></audio>
-<audio id="bgm" src="https://cdn.pixabay.com/download/audio/2022/03/15/audio_3f9f3f3f3f.mp3?filename=8-bit-adventure-123456.mp3" loop></audio>
-
-<script>
-// 基本設定
+  <audio id="hitSound" src="https://cdn.pixabay.com/download/audio/2022/03/15/audio_6e3e3b6f3f.mp3?filename=click-124467.mp3"></audio>
+  <audio id="bgm" src="https://cdn.pixabay.com/download/audio/2022/03/15/audio_3f9f3f3f3f.mp3?filename=8-bit-adventure-123456.mp3" loop></audio>
+  <script>
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 const W = canvas.width, H = canvas.height;
-const laneWidth = W/4;
-const judgeLineY = H-60;
+const laneWidth = W / 4;
+const judgeLineY = H - 60;
 const keys = ['d','f','j','k'];
 const keyDown = new Set();
-let score=0, combo=0, lastJudgementText='-';
-let startTime=0, running=false;
-let chart=[], comboFlash='';
-let loopId=null, paused=false;
-let lastTouchTime={}, elapsedBeforePause=0;
+let score = 0, combo = 0, lastJudgementText = '-';
+let startTime = 0, running = false;
+let chart = [];
+let comboFlash = '';
+let loopId = null;
+let paused = false;
+let lastTouchTime = {};
 const hitSound = document.getElementById('hitSound');
 const bgm = document.getElementById('bgm');
-let baseNoteSpeed=550, noteSpeed=baseNoteSpeed;
-const noteRadius=30; // 音符半徑
+let baseNoteSpeed = 550;
+let noteSpeed = baseNoteSpeed;
+let elapsedBeforePause = 0; // ← 新增記錄暫停前經過的時間
 
-// 鍵盤事件
-window.addEventListener('keydown', e=>{
+window.addEventListener('keydown', e => {
   const k = e.key.toLowerCase();
-  if(keys.includes(k)) keyDown.add(k);
-  if(e.key==='Escape') paused ? resumeGame() : pauseGame();
+  if (keys.includes(k)) keyDown.add(k);
+  if (e.key === 'Escape') {
+    if (paused) resumeGame();
+    else pauseGame();
+  }
 });
-window.addEventListener('keyup', e=>{
+window.addEventListener('keyup', e => {
   const k = e.key.toLowerCase();
-  if(keys.includes(k)) keyDown.delete(k);
+  if (keys.includes(k)) keyDown.delete(k);
 });
 
-// 觸控事件
-keys.forEach(k=>{
-  const el = document.getElementById('key-'+k);
-  el.addEventListener('touchstart', e=>{
+keys.forEach(k => {
+  const el = document.getElementById('key-' + k);
+  el.addEventListener('touchstart', e => {
     e.preventDefault();
     const now = Date.now();
-    if(lastTouchTime[k] && now-lastTouchTime[k]<100) return;
+    if (lastTouchTime[k] && now - lastTouchTime[k] < 100) return;
     lastTouchTime[k] = now;
     keyDown.add(k);
-    setTimeout(()=>keyDown.delete(k),100);
-  }, {passive:false});
+    setTimeout(() => keyDown.delete(k), 100);
+  }, { passive: false });
 });
 
-// 更新 HUD
-function updateHUD(){
+function updateHUD() {
   document.getElementById('score').textContent = score;
   document.getElementById('combo').textContent = combo;
   document.getElementById('judgement').textContent = lastJudgementText;
 }
 
-// 打擊閃光
-function flashKey(k){
-  const el = document.getElementById('key-'+k);
-  if(!el) return;
+function flashKey(k) {
+  const el = document.getElementById('key-' + k);
+  if (!el) return;
   el.classList.add('flash');
-  setTimeout(()=>el.classList.remove('flash'),150);
+  setTimeout(() => el.classList.remove('flash'), 150);
 }
 
-// 判定
-function judge(dy, laneKey){
-  let j='GOOD', add=300;
-  const adt = Math.abs(dy);
-  if(adt <= noteRadius*0.5){ j='PERFECT'; add=1000; }
-  else if(adt <= noteRadius){ j='GREAT'; add=600; }
+function judge(dtMs, laneKey) {
+  let j = 'GOOD', add = 300;
+  const adt = Math.abs(dtMs);
+  if (adt <= 50) { j = 'PERFECT'; add = 1000; }
+  else if (adt <= 100) { j = 'GREAT'; add = 600; }
   score += add;
   combo += 1;
   lastJudgementText = j;
   updateHUD();
-  hitSound.currentTime=0;
+  hitSound.currentTime = 0;
   hitSound.play();
   flashKey(laneKey);
-  if(combo%10===0){
-    comboFlash=`COMBO x${combo}!!`;
-    setTimeout(()=>comboFlash='',800);
+  if (combo % 10 === 0) {
+    comboFlash = `COMBO x${combo}!!`;
+    setTimeout(() => comboFlash = '', 800);
   }
 }
 
-// MISS
-function miss(){
-  lastJudgementText='MISS';
-  combo=0;
+function miss() {
+  lastJudgementText = 'MISS';
+  combo = 0;
   updateHUD();
 }
 
-// 生成譜面
-function generateChart(){
-  chart=[];
-  let time=1;
-  const endTime=Math.random()*20+110;
+function generateChart() {
+  chart = [];
+  let time = 1;
+  const endTime = Math.random() * 20 + 110;
   const difficulty = document.getElementById('difficultySelect').value;
-  let doubleNoteChance=0.35,timeGapMin=0.2,timeGapMax=0.45;
-  if(difficulty==='beginner'){ doubleNoteChance=0.2; timeGapMin=0.3; timeGapMax=0.6; }
-  else if(difficulty==='easy'){ doubleNoteChance=0.2; timeGapMin=0.25; timeGapMax=0.5; }
-  else if(difficulty==='normal'){ doubleNoteChance=0.35; timeGapMin=0.2; timeGapMax=0.45; }
-  else if(difficulty==='hard'){ doubleNoteChance=0.6; timeGapMin=0.15; timeGapMax=0.35; }
-  else if(difficulty==='hell'){ doubleNoteChance=0.9; timeGapMin=0.1; timeGapMax=0.25; }
+  let doubleNoteChance = 0.35;
+  let timeGapMin = 0.2;
+  let timeGapMax = 0.45;
 
-  while(time<endTime){
-    const lanesUsed=new Set();
-    const notesThisFrame=[];
-    const count = Math.random()<doubleNoteChance?2:1;
-    while(notesThisFrame.length<count){
-      const lane = Math.floor(Math.random()*4);
-      if(!lanesUsed.has(lane)){
+  if (difficulty === 'beginner') {
+    doubleNoteChance = 0.2;
+    timeGapMin = 0.3;
+    timeGapMax = 0.6;
+  } else if (difficulty === 'easy') {
+    doubleNoteChance = 0.2;
+    timeGapMin = 0.25;
+    timeGapMax = 0.5;
+  } else if (difficulty === 'normal') {
+    doubleNoteChance = 0.35;
+    timeGapMin = 0.2;
+    timeGapMax = 0.45;
+  } else if (difficulty === 'hard') {
+    doubleNoteChance = 0.6;
+    timeGapMin = 0.15;
+    timeGapMax = 0.35;
+  } else if (difficulty === 'hell') {
+    doubleNoteChance = 0.9;
+    timeGapMin = 0.1;
+    timeGapMax = 0.25;
+  }
+
+  while (time < endTime) {
+    const lanesUsed = new Set();
+    const notesThisFrame = [];
+    const count = Math.random() < doubleNoteChance ? 2 : 1;
+    while (notesThisFrame.length < count) {
+      const lane = Math.floor(Math.random() * 4);
+      if (!lanesUsed.has(lane)) {
         lanesUsed.add(lane);
-        notesThisFrame.push({t:time,lane,type:'tap',hit:false,y:-50});
+        notesThisFrame.push({
+          t: time,
+          lane,
+          type: 'tap',
+          hit: false,
+          y: -50
+        });
       }
     }
     chart.push(...notesThisFrame);
-    time += Math.random()*(timeGapMax-timeGapMin)+timeGapMin;
+    time += Math.random() * (timeGapMax - timeGapMin) + timeGapMin;
   }
 }
 
-// 遊戲邏輯
 function update(t) {
-  // 更新音符位置
   chart.forEach(n => {
     n.y = judgeLineY - (n.t - t) * noteSpeed;
   });
 
-  // 判定音符是否被擊中或 MISS
   chart.forEach(n => {
     const laneKey = keys[n.lane];
-    const dy = n.y - judgeLineY; // 音符圓心到判定線距離
-
-    // 防亂打：只有對應按鍵才有效
-    if (!n.hit && keyDown.has(laneKey)) {
-      if (Math.abs(dy) <= noteRadius) {
-        // 命中
-        judge(dy, laneKey);
-        n.hit = true;
-        keyDown.delete(laneKey);
-      } else {
-        // 按錯位，不計分，只閃光
-        flashKey(laneKey);
-        keyDown.delete(laneKey);
-      }
-    }
-
-    // MISS 判定
-    if (!n.hit && dy > noteRadius) {
+    const dtMs = (t - n.t) * 1000;
+    if (!n.hit && Math.abs(dtMs) <= 200 && keyDown.has(laneKey)) {
+      judge(dtMs, laneKey);
+      keyDown.delete(laneKey);
+      n.hit = true;
+    } else if (!n.hit && dtMs > 200) {
       miss();
       n.hit = true;
     }
   });
 }
 
-// 渲染遊戲畫面
 function render() {
   ctx.clearRect(0, 0, W, H);
-
-  // 畫判定線
   ctx.strokeStyle = '#fff';
   ctx.beginPath();
   ctx.moveTo(0, judgeLineY);
   ctx.lineTo(W, judgeLineY);
   ctx.stroke();
 
-  // 畫音符
   const laneColors = ['#b266ff', '#66ccff', '#66ff66', '#ff6666'];
   chart.forEach(n => {
     if (n.hit) return;
     const x = n.lane * laneWidth + laneWidth / 2;
     ctx.fillStyle = laneColors[n.lane];
     ctx.beginPath();
-    ctx.arc(x, n.y, noteRadius, 0, Math.PI * 2);
+    ctx.arc(x, n.y, 30, 0, Math.PI * 2);
     ctx.fill();
   });
 
-  // 判定文字
   if (lastJudgementText !== '-') {
     ctx.fillStyle = '#fff';
     ctx.font = 'bold 32px sans-serif';
@@ -344,7 +345,6 @@ function render() {
     ctx.fillText(lastJudgementText, W / 2, judgeLineY - 40);
   }
 
-  // 連擊文字
   if (comboFlash) {
     ctx.fillStyle = '#ff78b5';
     ctx.font = 'bold 36px sans-serif';
@@ -352,7 +352,6 @@ function render() {
     ctx.fillText(comboFlash, W / 2, H / 2 - 100);
   }
 
-  // 遊戲結束
   if (!running && chart.every(n => n.hit)) {
     document.getElementById('gameScreen').style.display = 'none';
     document.getElementById('endScreen').style.display = 'block';
@@ -360,7 +359,6 @@ function render() {
   }
 }
 
-// 遊戲主迴圈
 function loop(ts) {
   if (paused) return;
   const t = (ts - startTime) / 1000;
@@ -375,7 +373,6 @@ function loop(ts) {
   loopId = requestAnimationFrame(loop);
 }
 
-// 顯示倒數
 function showCountdown(callback) {
   const countdownText = document.getElementById('countdownText');
   const steps = ['Ready', '3', '2', '1', 'Go!'];
@@ -390,7 +387,7 @@ function showCountdown(callback) {
     countdownText.textContent = steps[i];
     countdownText.style.display = 'block';
     countdownText.classList.remove('countdown');
-    void countdownText.offsetWidth; // 強制重繪以觸發動畫
+    void countdownText.offsetWidth;
     countdownText.classList.add('countdown');
     i++;
     setTimeout(nextStep, 700);
@@ -399,7 +396,6 @@ function showCountdown(callback) {
   nextStep();
 }
 
-// 開始遊戲
 function startGame() {
   const difficulty = document.getElementById('difficultySelect').value;
   const speedMultiplierSelect = document.getElementById('speedMultiplier');
@@ -420,7 +416,7 @@ function startGame() {
   keyDown.clear();
   paused = false;
   running = true;
-  elapsedBeforePause = 0;
+  elapsedBeforePause = 0; // 重設暫停時間紀錄
 
   updateHUD();
   generateChart();
@@ -437,19 +433,20 @@ function startGame() {
   });
 }
 
-// 暫停遊戲
 function pauseGame() {
   if (!running || paused) return;
   paused = true;
   bgm.pause();
   cancelAnimationFrame(loopId);
+
+  // 記錄暫停時的經過時間
   elapsedBeforePause = performance.now() - startTime;
+
   document.getElementById('gameScreen').classList.add('blur');
   document.getElementById('gameScreen').style.display = 'none';
   document.getElementById('pauseScreen').style.display = 'block';
 }
 
-// 恢復遊戲
 function resumeGame() {
   if (!paused) return;
   paused = false;
@@ -458,13 +455,13 @@ function resumeGame() {
   document.getElementById('gameScreen').classList.remove('blur');
 
   showCountdown(() => {
+    // 從暫停前的進度繼續
     startTime = performance.now() - elapsedBeforePause;
     bgm.play();
     loopId = requestAnimationFrame(loop);
   });
 }
 
-// 回主選單
 function goToMenu() {
   document.getElementById('endScreen').style.display = 'none';
   document.getElementById('gameScreen').style.display = 'none';
@@ -475,17 +472,15 @@ function goToMenu() {
   bgm.pause();
 }
 
-// 顯示選項
 function showOptions() {
   document.getElementById('menuScreen').style.display = 'none';
   document.getElementById('optionsScreen').style.display = 'block';
 }
 
-// 禁止右鍵
-document.addEventListener("contextmenu", function(e){
+document.addEventListener("contextmenu", function(e) {
   e.preventDefault();
 });
-  </script>
+</script>
 </body>
 </html>
 
