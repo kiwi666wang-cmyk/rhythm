@@ -13,6 +13,17 @@
       font-family: sans-serif;
       text-align: center;
       touch-action: manipulation;
+      transition: background 0.5s ease;
+    }
+    body.ex-mode {
+      background: linear-gradient(to bottom, #ff3300, #990000, #000000);
+    }
+    body.ex-flash {
+      animation: exFlash 0.3s ease;
+    }
+    @keyframes exFlash {
+      0% { background: #ff4444; }
+      100% { background: linear-gradient(to bottom, #ff3300, #990000, #000000); }
     }
     canvas {
       display: block;
@@ -114,11 +125,12 @@
     <h2>⚙️ 遊戲選項</h2>
     <label for="difficultySelect">難度：</label>
     <select id="difficultySelect">
-      <option value="beginner">初學者</option>
-      <option value="easy">簡單</option>
-      <option value="normal" selected>普通</option>
-      <option value="hard">困難</option>
+      <option value="ex">EX（極限）</option>
       <option value="hell">地獄</option>
+      <option value="hard">困難</option>
+      <option value="normal" selected>普通</option>
+      <option value="easy">簡單</option>
+      <option value="beginner">初學者</option>
     </select>
     <br><br>
     <label for="speedMultiplier">速度倍率：</label>
@@ -159,6 +171,12 @@
   <div id="endScreen" style="display: none;">
     <h2>🎮 遊戲結束！</h2>
     <p>分數：<span id="finalScore">0</span></p>
+    <p>PERFECT：<span id="statPerfect">0</span></p>
+    <p>GREAT：<span id="statGreat">0</span></p>
+    <p>GOOD：<span id="statGood">0</span></p>
+    <p>BAD：<span id="statBad">0</span></p>
+    <p>WRONG：<span id="statWrong">0</span></p>
+    <p>MISS：<span id="statMiss">0</span></p>
     <button onclick="startGame()">再玩一次</button>
     <button onclick="goToMenu()">回主選單</button>
   </div>
@@ -189,6 +207,19 @@ const bgm = document.getElementById('bgm');
 let baseNoteSpeed = 550;
 let noteSpeed = baseNoteSpeed;
 
+// --- 判定與錯誤冷卻常數 ---
+const JUDGE_WINDOW_MS = 200;
+const MISS_Y_OFFSET = 40;
+const WRONG_COOLDOWN_MS = 250;
+const TOUCH_WINDOW_MS = 200;
+
+// 統計與失敗一次性保險
+let lastWrongTime = {};
+let missCount = 0;
+let gameOver = false;
+let stats = { perfect:0, great:0, good:0, bad:0, wrong:0, miss:0 };
+
+// 鍵盤事件
 window.addEventListener('keydown', e => {
   const k = e.key.toLowerCase();
   if (keys.includes(k)) keyDown.add(k);
@@ -202,6 +233,7 @@ window.addEventListener('keyup', e => {
   if (keys.includes(k)) keyDown.delete(k);
 });
 
+// 觸控事件（點擊圓鍵）
 keys.forEach(k => {
   const el = document.getElementById('key-' + k);
   el.addEventListener('touchstart', e => {
@@ -209,8 +241,7 @@ keys.forEach(k => {
     const now = Date.now();
     if (lastTouchTime[k] && now - lastTouchTime[k] < 100) return;
     lastTouchTime[k] = now;
-    keyDown.add(k);
-    setTimeout(() => keyDown.delete(k), 100);
+    processPress(k); // 觸控直接判定
   }, { passive: false });
 });
 
@@ -228,10 +259,14 @@ function flashKey(k) {
 }
 
 function judge(dtMs, laneKey) {
-  let j = 'GOOD', add = 300;
   const adt = Math.abs(dtMs);
-  if (adt <= 50) { j = 'PERFECT'; add = 1000; }
-  else if (adt <= 100) { j = 'GREAT'; add = 600; }
+  let j = 'GOOD', add = 300;
+
+  if (adt <= 50) { j = 'PERFECT'; add = 1000; stats.perfect++; }
+  else if (adt <= 100) { j = 'GREAT'; add = 600; stats.great++; }
+  else if (adt <= 150) { j = 'GOOD'; add = 300; stats.good++; }
+  else { j = 'BAD'; add = 100; stats.bad++; }
+
   score += add;
   combo += 1;
   lastJudgementText = j;
@@ -245,30 +280,91 @@ function judge(dtMs, laneKey) {
   }
 }
 
+// —— 只有真正「漏接」音符才算 MISS ——
 function miss() {
   lastJudgementText = 'MISS';
   combo = 0;
+  missCount++;
+  stats.miss++;
   updateHUD();
+
+  // EX 模式：MISS 超過 15 → 你輸了 + 回主畫面（只觸發一次）
+  const difficulty = document.getElementById('difficultySelect').value;
+  if (difficulty === 'ex' && missCount > 15) {
+    triggerFailOnce('你輸了！Miss 超過 15 次');
+  }
 }
 
+// 防呆：確保失敗只觸發一次，避免 alert 無限彈
+function triggerFailOnce(msg) {
+  if (gameOver) return;
+  gameOver = true;
+  running = false;
+  try { cancelAnimationFrame(loopId); } catch {}
+  try { bgm.pause(); } catch {}
+  setTimeout(() => {
+    alert(msg);
+    goToMenu();
+  }, 0);
+}
+
+// 錯鍵處罰（不計入 MISS），並加入冷卻避免連扣
 function checkRandomHit(t) {
+  const nowMs = performance.now();
   keys.forEach(k => {
     if (!keyDown.has(k)) return;
     const lane = keys.indexOf(k);
     const hasValidNote = chart.some(n =>
       !n.hit &&
       n.lane === lane &&
-      Math.abs((t - n.t) * 1000) <= 200
+      Math.abs((t - n.t) * 1000) <= JUDGE_WINDOW_MS
     );
     if (!hasValidNote) {
-      lastJudgementText = 'WRONG';
-      score = Math.max(0, score - 100);
-      combo = 0;
-      updateHUD();
-      flashKey(k);
+      if (!lastWrongTime[k] || nowMs - lastWrongTime[k] > WRONG_COOLDOWN_MS) {
+        lastWrongTime[k] = nowMs;
+        lastJudgementText = 'WRONG';
+        score = Math.max(0, score - 100);
+        combo = 0;
+        stats.wrong++;
+        updateHUD();
+        flashKey(k);
+      }
       keyDown.delete(k);
     }
   });
+}
+
+// 觸控：就近判定該軌道上的可判定音符，否則給 WRONG 扣分（不算 MISS）
+function processPress(k) {
+  if (!running) return;
+  const nowT = (performance.now() - startTime) / 1000;
+  let nearest = null;
+  let bestAbs = Infinity;
+  for (let i = 0; i < chart.length; i++) {
+    const n = chart[i];
+    if (n.hit) continue;
+    if (keys[n.lane] !== k) continue;
+    const absDt = Math.abs((nowT - n.t) * 1000);
+    if (absDt <= TOUCH_WINDOW_MS && absDt < bestAbs) {
+      bestAbs = absDt;
+      nearest = n;
+    }
+  }
+  if (nearest) {
+    judge((nowT - nearest.t) * 1000, k);
+    nearest.hit = true;
+  } else {
+    const nowMs = performance.now();
+    if (!lastWrongTime[k] || nowMs - lastWrongTime[k] > WRONG_COOLDOWN_MS) {
+      lastWrongTime[k] = nowMs;
+      lastJudgementText = 'WRONG';
+      score = Math.max(0, score - 100);
+      combo = 0;
+      stats.wrong++;
+      updateHUD();
+      flashKey(k);
+    }
+  }
 }
 
 function generateChart() {
@@ -300,6 +396,58 @@ function generateChart() {
     doubleNoteChance = 0.9;
     timeGapMin = 0.1;
     timeGapMax = 0.25;
+  } else if (difficulty === 'ex') {
+    doubleNoteChance = 0.3;
+    timeGapMin = 0.12;
+    timeGapMax = 0.25;
+
+    // 第一段：交錯連打
+    for (let i = 0; i < 40; i++) {
+      const lane = i % 4;
+      chart.push({ t: time + i * 0.1, lane, type: 'tap', hit: false, y: -50 });
+    }
+    time += 4.0;
+
+    // 第二段：鍵位反轉 + 雙鍵混合
+    for (let i = 0; i < 20; i++) {
+      const lane1 = 3 - (i % 4);
+      const lane2 = (lane1 + 1) % 4;
+      chart.push({ t: time + i * 0.12, lane: lane1, type: 'tap', hit: false, y: -50 });
+      if (Math.random() < 0.5) {
+        chart.push({ t: time + i * 0.12, lane: lane2, type: 'tap', hit: false, y: -50 });
+      }
+    }
+    time += 2.4;
+
+    // 第三段：節奏突變 + 雙鍵爆發
+    for (let i = 0; i < 30; i++) {
+      const gap = i % 3 === 0 ? 0.15 : (i % 3 === 1 ? 0.22 : 0.1);
+      const lane1 = Math.floor(Math.random() * 4);
+      chart.push({ t: time + i * gap, lane: lane1, type: 'tap', hit: false, y: -50 });
+      if (Math.random() < 0.6) {
+        let lane2 = Math.floor(Math.random() * 4);
+        while (lane2 === lane1) lane2 = Math.floor(Math.random() * 4);
+        chart.push({ t: time + i * gap, lane: lane2, type: 'tap', hit: false, y: -50 });
+      }
+    }
+    time += 5.0;
+
+    // 第四段：高速亂打 + 三連突刺（加強複雜度）
+    for (let i = 0; i < 36; i++) {
+      const base = time + i * 0.22;
+      const seq = [0,1,2].map(j => base + j * 0.06);
+      const laneSeed = Math.floor(Math.random() * 4);
+      seq.forEach(ti => {
+        const l1 = (laneSeed + Math.floor(Math.random() * 4)) % 4;
+        chart.push({ t: ti, lane: l1, type: 'tap', hit: false, y: -50 });
+        if (Math.random() < 0.5) {
+          let l2 = Math.floor(Math.random() * 4);
+          while (l2 === l1) l2 = Math.floor(Math.random() * 4);
+          chart.push({ t: ti, lane: l2, type: 'tap', hit: false, y: -50 });
+        }
+      });
+    }
+    time += 36 * 0.22;
   }
 
   while (time < endTime) {
@@ -310,13 +458,7 @@ function generateChart() {
       const lane = Math.floor(Math.random() * 4);
       if (!lanesUsed.has(lane)) {
         lanesUsed.add(lane);
-        notesThisFrame.push({
-          t: time,
-          lane,
-          type: 'tap',
-          hit: false,
-          y: -50
-        });
+        notesThisFrame.push({ t: time, lane, type: 'tap', hit: false, y: -50 });
       }
     }
     chart.push(...notesThisFrame);
@@ -330,13 +472,14 @@ function update(t) {
   });
 
   chart.forEach(n => {
+    if (n.hit) return;
     const laneKey = keys[n.lane];
     const dtMs = (t - n.t) * 1000;
-    if (!n.hit && Math.abs(dtMs) <= 200 && keyDown.has(laneKey)) {
+    if (keyDown.has(laneKey) && Math.abs(dtMs) <= JUDGE_WINDOW_MS) {
       judge(dtMs, laneKey);
       keyDown.delete(laneKey);
       n.hit = true;
-    } else if (!n.hit && dtMs > 200) {
+    } else if (n.y > judgeLineY + MISS_Y_OFFSET) {
       miss();
       n.hit = true;
     }
@@ -376,26 +519,48 @@ function render() {
   }
 
   if (!running && chart.every(n => n.hit)) {
+    // 填寫結算統計
+    document.getElementById('finalScore').textContent = score;
+    document.getElementById('statPerfect').textContent = stats.perfect;
+    document.getElementById('statGreat').textContent = stats.great;
+    document.getElementById('statGood').textContent = stats.good;
+    document.getElementById('statBad').textContent = stats.bad;
+    document.getElementById('statWrong').textContent = stats.wrong;
+    document.getElementById('statMiss').textContent = stats.miss;
+
     document.getElementById('gameScreen').style.display = 'none';
     document.getElementById('endScreen').style.display = 'block';
-    document.getElementById('finalScore').textContent = score;
   }
 }
 
 function loop(ts) {
-  if (paused) return;
-  const t = (ts - startTime) / 1000;
-  update(t);
-  checkRandomHit(t);
-  render();
-  if (chart.every(n => n.hit)) {
-    running = false;
-    lastJudgementText = 'END';
-    updateHUD();
-    return;
+    if (paused) return;
+    const t = (ts - startTime) / 1000;
+    update(t);
+    checkRandomHit(t);
+    render();
+
+    if (chart.every(n => n.hit)) {
+      running = false;
+      lastJudgementText = 'END';
+      updateHUD();
+
+      // 🔥 顯示結算畫面
+      document.getElementById('finalScore').textContent = score;
+      document.getElementById('statPerfect').textContent = stats.perfect;
+      document.getElementById('statGreat').textContent = stats.great;
+      document.getElementById('statGood').textContent = stats.good;
+      document.getElementById('statBad').textContent = stats.bad;
+      document.getElementById('statWrong').textContent = stats.wrong;
+      document.getElementById('statMiss').textContent = stats.miss;
+
+      document.getElementById('gameScreen').style.display = 'none';
+      document.getElementById('endScreen').style.display = 'block';
+      return;
+    }
+
+    loopId = requestAnimationFrame(loop);
   }
-  loopId = requestAnimationFrame(loop);
-}
 
 function showCountdown(callback) {
   const countdownText = document.getElementById('countdownText');
@@ -426,7 +591,13 @@ function startGame() {
   let multiplier = parseFloat(speedMultiplierSelect.value);
   if (difficulty === 'beginner') multiplier = 0.8;
   else if (difficulty === 'easy') multiplier = 0.9;
+  else if (difficulty === 'ex') multiplier = 1.8;
   noteSpeed = baseNoteSpeed * multiplier;
+
+  document.body.classList.remove('ex-mode');
+  if (difficulty === 'ex') {
+    document.body.classList.add('ex-mode');
+  }
 
   bgm.pause();
   bgm.currentTime = 0;
@@ -440,6 +611,10 @@ function startGame() {
   keyDown.clear();
   paused = false;
   running = true;
+  lastWrongTime = {};
+  missCount = 0;
+  gameOver = false;
+  stats = { perfect:0, great:0, good:0, bad:0, wrong:0, miss:0 };
   elapsedTimeBeforePause = 0;
 
   updateHUD();
@@ -491,7 +666,8 @@ function goToMenu() {
   document.getElementById('pauseScreen').style.display = 'none';
   document.getElementById('menuScreen').style.display = 'block';
   document.getElementById('gameScreen').classList.remove('blur');
-  bgm.pause();
+  document.body.classList.remove('ex-mode');
+  try { bgm.pause(); } catch {}
 }
 
 function showOptions() {
@@ -505,4 +681,6 @@ document.addEventListener("contextmenu", function(e) {
 </script>
 </body>
 </html>
+
+
 
