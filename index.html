@@ -184,6 +184,7 @@ const hitSound = document.getElementById('hitSound');
 const bgm = document.getElementById('bgm');
 let baseNoteSpeed = 550;
 let noteSpeed = baseNoteSpeed;
+let elapsedBeforePause = 0; // ← 新增記錄暫停前經過的時間
 
 window.addEventListener('keydown', e => {
   const k = e.key.toLowerCase();
@@ -415,12 +416,13 @@ function startGame() {
   keyDown.clear();
   paused = false;
   running = true;
+  elapsedBeforePause = 0; // 重設暫停時間紀錄
 
   updateHUD();
   generateChart();
 
   document.getElementById('menuScreen').style.display = 'none';
-    document.getElementById('pauseScreen').style.display = 'none';
+  document.getElementById('pauseScreen').style.display = 'none';
   document.getElementById('gameScreen').style.display = 'block';
   document.getElementById('gameScreen').classList.remove('blur');
 
@@ -436,6 +438,10 @@ function pauseGame() {
   paused = true;
   bgm.pause();
   cancelAnimationFrame(loopId);
+
+  // 記錄暫停時的經過時間
+  elapsedBeforePause = performance.now() - startTime;
+
   document.getElementById('gameScreen').classList.add('blur');
   document.getElementById('gameScreen').style.display = 'none';
   document.getElementById('pauseScreen').style.display = 'block';
@@ -449,7 +455,8 @@ function resumeGame() {
   document.getElementById('gameScreen').classList.remove('blur');
 
   showCountdown(() => {
-    startTime = performance.now() - (chart[0].t * 1000);
+    // 從暫停前的進度繼續
+    startTime = performance.now() - elapsedBeforePause;
     bgm.play();
     loopId = requestAnimationFrame(loop);
   });
@@ -477,13 +484,6 @@ document.addEventListener("contextmenu", function(e) {
 </body>
 </html>
 
-
-
-
-
-
-
- 
 
 
 
