@@ -220,6 +220,7 @@ let comboFlash = '';
 let loopId = null;
 let paused = false;
 let lastTouchTime = {};
+let keySafeUntil = {};
 let elapsedTimeBeforePause = 0;
 
 /* ----------------------------
@@ -323,7 +324,10 @@ window.addEventListener('keydown', e => {
 });
 window.addEventListener('keyup', e => {
   const k = e.key.toLowerCase();
-  if (keys.includes(k)) keyDown.delete(k);
+  if (keys.includes(k)) {
+    keyDown.delete(k);
+    delete keySafeUntil[k];
+  }
 });
 
 /* ----------------------------
@@ -378,12 +382,13 @@ function judge(dtMs, laneKey) {
   updateHUD();
   try { hitSound.currentTime = 0; hitSound.play(); } catch(e) {}
   flashKey(laneKey);
+  keySafeUntil[laneKey] = performance.now() + WRONG_COOLDOWN_MS;
   if (combo % 10 === 0) {
     comboFlash = `COMBO x${combo}!!`;
     setTimeout(() => comboFlash = '', 800);
   }
 }
-
+    
 function miss() {
   lastJudgementText = 'MISS';
   combo = 0;
@@ -409,17 +414,22 @@ function triggerFailOnce(msg) {
 /* 錯鍵處罰（不計入 MISS），加入近拍保護 */
 function checkRandomHit(t) {
   const nowMs = performance.now();
-  keys.forEach(k => {
+ keys.forEach(k => {
     if (!keyDown.has(k)) return;
     const lane = keys.indexOf(k);
+
+    if (keySafeUntil[k]) {
+      if (nowMs < keySafeUntil[k]) return;
+      delete keySafeUntil[k];
+    }
 
     const hasValidNote = chart.some(n =>
       !n.hit && n.lane === lane && Math.abs((t - n.t) * 1000) <= JUDGE_WINDOW_MS
     );
-    const hasNearNote = chart.some(n =>
+   const hasNearNote = chart.some(n =>
       !n.hit && n.lane === lane && Math.abs((t - n.t) * 1000) <= NEAR_WINDOW_MS
     );
-
+ 
     if (!hasValidNote) {
       if (hasNearNote) return; // 近拍保護：提早壓不扣
       if (!lastWrongTime[k] || nowMs - lastWrongTime[k] > WRONG_COOLDOWN_MS) {
@@ -748,6 +758,7 @@ function startGame() {
   comboFlash = '';
   chart = [];
   keyDown.clear();
+  keySafeUntil = {};
   paused = false;
   running = true;
   lastWrongTime = {};
@@ -822,6 +833,7 @@ document.addEventListener("gesturestart", e => e.preventDefault());
   </script>
 </body>
 </html>
+
 
 
 
