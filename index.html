@@ -184,11 +184,41 @@
   <div id="countdownText" class="countdown" style="display:none;"></div>
 
   <audio id="hitSound" src="https://cdn.pixabay.com/download/audio/2022/03/15/audio_6e3e3b6f3f.mp3?filename=click-124467.mp3"></audio>
-
-  <!-- ✅ 使用你的歌曲檔案；不要 loop，會依歌曲長度自然結束 -->
-  <audio id="bgm" src="music/Lost%20Sky,%20Sara%20Skinner%20-%20Dreams%20pt.%20II%20(feat.%20Sara%20Skinner)%20%5BNCS%20Release%5D.mp3"></audio>
-
+  <audio id="bgm"></audio> <!-- ✅ 播放隨機選歌 -->
   <script>
+/* ----------------------------
+   🎵 歌曲清單（放在 /music/）
+   - 會於開始遊戲時隨機挑一首並播放
+   - 使用 encodeURI 確保路徑可用
+-----------------------------*/
+const SONGS = [
+  { title: "Charlie Puth - Light Switch", file: "Charlie Puth - Light Switch [Official Music Video] - Charlie Puth.mp3" },
+  { title: "Creepy Nuts - オトノケ (Otonoke)", file: "Creepy Nuts - オトノケ(Otonoke) 【Official MV】 [Dandadan OP] - Creepy Nuts.mp3" },
+  { title: "Creepy Nuts - Mirage (Call of the Night OP)", file: "Creepy Nuts ”Mirage” × Anime ”Call of the Night” Collaboration Music Video Opening Theme Song - Creepy Nuts.mp3" },
+  { title: "Creepy Nuts - Nemure (Call of the Night ED)", file: "Creepy Nuts ”Nemure” × Anime ”Call of the Night” Collaboration Music Video Ending Theme Song - Creepy Nuts (1).mp3" },
+  { title: "Creepy Nuts - Bling-Bang-Bang-Born", file: "Creepy Nuts｢Bling-Bang-Bang-Born｣ × TV Anime｢マッシュル-MASHLE-｣ Collaboration Music Video #BBBBダンス - Creepy Nuts.mp3" },
+  { title: "KANA-BOON - Silhouette", file: "KANA-BOON - Silhouette - KANABOONVEVO.mp3" },
+  { title: "Lost Sky - Fearless pt.II (feat. Chris Linton)", file: "Lost Sky - Fearless pt.II (feat. Chris Linton) Trap NCS - Copyright Free Music - NoCopyrightSounds.mp3" },
+  { title: "Lost Sky - Vision pt. II (feat. She Is Jules)", file: "Lost Sky - Vision pt. II (feat. She Is Jules) Future Trap NCS - Copyright Free Music - NoCopyrightSounds.mp3" },
+  { title: "Lost Sky - Where We Started (feat. Jex)", file: "Lost Sky - Where We Started (feat. Jex) Melodic Dubstep NCS - Copyright Free Music - NoCopyrightSounds.mp3" },
+  { title: "Lost Sky, Sara Skinner - Dreams pt. II [NCS]", file: "Lost Sky, Sara Skinner - Dreams pt. II (feat. Sara Skinner) [NCS Release].mp3" },
+  { title: "OneRepublic - Nobody (Kaiju No. 8)", file: "OneRepublic - Nobody (from Kaiju No. 8) [Official Music Video] - OneRepublicVEVO.mp3" },
+  { title: "YOASOBI - Watch me!", file: "YOASOBI「Watch me!」Official Music Video - Ayase _ YOASOBI.mp3" },
+  { title: "yung kai - blue", file: "yung kai - blue (official music video) - yung kai.mp3" },
+  { title: "AKASAKI - Bunny Girl", file: "【AKASAKI】Bunny Girl _ バニーガール（Lyric Video） - AKASAKI (19).mp3" },
+  { title: "ゆーり - 隙", file: "【MV】隙_ゆーり【オリジナル】 - ゆーり🍎🐥〔24〕・yuri (1).mp3" },
+  { title: "imase - NIGHT DANCER", file: "【imase】NIGHT DANCER（MV） - imase.mp3" },
+  { title: "しぐれうい - 粛聖!! ロリ神レクイエム☆", file: "【オリジナル楽曲】粛聖!! ロリ神レクイエム☆ _ しぐれうい（9さい）【IOSYS（まろん&D.watt）】 - しぐれうい.mp3" },
+  { title: "なとり - Overdose", file: "なとり - Overdose - なとり _ natori.mp3" },
+  { title: "ロクデナシ - ただ声一つ (One Voice)", file: "ロクデナシ「ただ声一つ」_ Rokudenashi - One Voice【Official Music Video】 - ロクデナシ _ Rokudenashi.mp3" },
+  { title: "ユイカ - 好きだから。", file: "好きだから。_ 『ユイカ』【MV】 - 『ユイカ』.mp3" },
+  { title: "Eve - 廻廻奇譚", file: "廻廻奇譚 - Eve MV - Eve.mp3" },
+  { title: "キタニタツヤ - 青のすみか (Where Our Blue Is)", file: "青のすみか _ キタニタツヤ - Where Our Blue Is _ Tatsuya Kitani - キタニタツヤ _ Tatsuya Kitani.mp3" },
+];
+
+/* ----------------------------
+   🎮 既有元素與變數（沿用你的結構）
+-----------------------------*/
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 const W = canvas.width, H = canvas.height;
@@ -216,9 +246,9 @@ let noteSpeed = baseNoteSpeed;
 // ---- 判定與錯誤冷卻常數 ----
 const JUDGE_WINDOW_MS = 200;
 const MISS_Y_OFFSET = 40;
-const WRONG_COOLDOWN_MS = 400; // ↑ 由 250 提高，降低錯判連扣
+const WRONG_COOLDOWN_MS = 400;
 const TOUCH_WINDOW_MS = 200;
-const NEAR_WINDOW_MS = JUDGE_WINDOW_MS + 60; // 近似預判窗口，避免過度 WRONG
+const NEAR_WINDOW_MS = JUDGE_WINDOW_MS + 60;
 
 // ---- 統計 & 失敗一次性保險 ----
 let lastWrongTime = {};
@@ -226,19 +256,40 @@ let missCount = 0;
 let gameOver = false;
 let stats = { perfect:0, great:0, good:0, bad:0, wrong:0, miss:0 };
 
-// ✅ EX 專用：BPM 與起始延遲（可微調以對齊）
-const EX_SONG_BPM = 140;     // 若量到更準，可改
-const EX_OFFSET   = 1.0;     // 歌曲起跑空拍
-let songDuration  = 215;     // 預設，loadedmetadata 後覆蓋
+// ✅ EX 專用：BPM 與起始延遲（保留，可日後用到）
+const EX_SONG_BPM = 140;
+const EX_OFFSET   = 1.0;
+let songDuration  = 215;
 
-// 取得歌曲實際長度
+// 取得歌曲實際長度（隨機選歌後才會被觸發）
 bgm.addEventListener('loadedmetadata', () => {
   if (!isNaN(bgm.duration) && bgm.duration > 0) {
     songDuration = bgm.duration;
   }
 });
 
-// 鍵盤事件
+/* ----------------------------
+   🔀 隨機選歌與顯示
+-----------------------------*/
+function pickRandomSong() {
+  const idx = Math.floor(Math.random() * SONGS.length);
+  return SONGS[idx];
+}
+function setSongAndPlay() {
+  const song = pickRandomSong();
+  const src = 'music/' + encodeURI(song.file);
+  bgm.src = src;
+  // 可選：你若想在 HUD 顯示曲名，可加一個 <div id="songTitle"></div> 然後：
+  // document.getElementById('songTitle').textContent = song.title;
+  // 為確保從頭開始播放
+  try { bgm.pause(); } catch {}
+  bgm.currentTime = 0;
+  bgm.play();
+}
+
+/* ----------------------------
+   鍵盤與觸控事件
+-----------------------------*/
 window.addEventListener('keydown', e => {
   const k = e.key.toLowerCase();
   if (keys.includes(k)) keyDown.add(k);
@@ -264,6 +315,9 @@ keys.forEach(k => {
   }, { passive: false });
 });
 
+/* ----------------------------
+   HUD 與打擊、MISS、WRONG
+-----------------------------*/
 function updateHUD() {
   document.getElementById('score').textContent = score;
   document.getElementById('combo').textContent = combo;
@@ -324,7 +378,7 @@ function triggerFailOnce(msg) {
   }, 0);
 }
 
-// 錯鍵處罰（不計入 MISS），加入「近拍保護」避免過敏
+// 錯鍵處罰（不計入 MISS），近拍保護
 function checkRandomHit(t) {
   const nowMs = performance.now();
   keys.forEach(k => {
@@ -334,15 +388,12 @@ function checkRandomHit(t) {
     const hasValidNote = chart.some(n =>
       !n.hit && n.lane === lane && Math.abs((t - n.t) * 1000) <= JUDGE_WINDOW_MS
     );
-
     const hasNearNote = chart.some(n =>
       !n.hit && n.lane === lane && Math.abs((t - n.t) * 1000) <= NEAR_WINDOW_MS
     );
 
     if (!hasValidNote) {
-      // 若附近就要到拍（near），視為提早壓，先不判 WRONG
-      if (hasNearNote) return;
-
+      if (hasNearNote) return; // 近拍保護
       if (!lastWrongTime[k] || nowMs - lastWrongTime[k] > WRONG_COOLDOWN_MS) {
         lastWrongTime[k] = nowMs;
         lastJudgementText = 'WRONG';
@@ -357,47 +408,14 @@ function checkRandomHit(t) {
   });
 }
 
-function processPress(k) {
-  if (!running) return;
-  const nowT = (performance.now() - startTime) / 1000;
-  let nearest = null;
-  let bestAbs = Infinity;
-  for (let i = 0; i < chart.length; i++) {
-    const n = chart[i];
-    if (n.hit) continue;
-    if (keys[n.lane] !== k) continue;
-    const absDt = Math.abs((nowT - n.t) * 1000);
-    if (absDt <= TOUCH_WINDOW_MS && absDt < bestAbs) {
-      bestAbs = absDt;
-      nearest = n;
-    }
-  }
-  if (nearest) {
-    judge((nowT - nearest.t) * 1000, k);
-    nearest.hit = true;
-  } else {
-    const nowMs = performance.now();
-    if (!lastWrongTime[k] || nowMs - lastWrongTime[k] > WRONG_COOLDOWN_MS) {
-      lastWrongTime[k] = nowMs;
-      lastJudgementText = 'WRONG';
-      score = Math.max(0, score - 100);
-      combo = 0;
-      stats.wrong++;
-      updateHUD();
-      flashKey(k);
-    }
-  }
-}
-
 /* ----------------------------
-   譜面生成（一般 & EX 專屬）
+   譜面生成（維持你原本：非 EX 隨機、EX 走拍）
 -----------------------------*/
 function generateChart() {
   chart = [];
   const difficulty = document.getElementById('difficultySelect').value;
 
   if (difficulty !== 'ex') {
-    // 原本隨機譜面（非 EX）
     let time = 1;
     const endTime = Math.random() * 20 + 110;
     let doubleNoteChance = 0.35;
@@ -433,7 +451,7 @@ function generateChart() {
     return;
   }
 
-  // ✅ EX：依 BPM + 分段產生，長度與歌曲同步（強化難度）
+  // EX：依 BPM + 分段產生（保留）
   generateEXChartByBPM(EX_SONG_BPM, EX_OFFSET, songDuration);
 }
 
@@ -442,7 +460,6 @@ function generateEXChartByBPM(bpm, offset, durationSec) {
   const start = Math.max(0, offset);
   const endTime = start + durationSec;
 
-  // 分段（比例切）
   const introEnd  = start + durationSec * 0.28;
   const chorusEnd = start + durationSec * 0.56;
   const dropEnd   = start + durationSec * 0.84;
@@ -454,8 +471,6 @@ function generateEXChartByBPM(bpm, offset, durationSec) {
 
   let laneCursor = 0;
   const nextLane = () => { laneCursor = (laneCursor + 1) % 4; return laneCursor; };
-
-  // 每 8 拍觸發一次 jack（雙押串）
   let beatsSinceJack = 0;
 
   while (t <= endTime) {
@@ -481,39 +496,29 @@ function generateEXChartByBPM(bpm, offset, durationSec) {
       beatsSinceJack += 0.5;
     }
     else if (section === 'drop') {
-      // 先一組三連
       pushNote(t, randLane());
       pushNote(t + beat / 3, (laneCursor + 1) % 4);
       pushNote(t + 2 * beat / 3, (laneCursor + 2) % 4);
-
-      // 疊雙鍵（重低音）
       if (Math.random() < 0.55) pushNote(t, (laneCursor + 3) % 4);
-
-      // 半拍交錯
-      if (Math.random() < 0.5) pushNote(t + beat / 2, nextLane());
-
-      // 偶發 1/4 拍爆發（加大密度）
+      if (Math.random() < 0.5)  pushNote(t + beat / 2, nextLane());
       if (Math.random() < 0.35) {
         const lanes = [0,1,2,3];
         for (let i = 1; i <= 3; i++) {
           pushNote(t + i * (beat / 4), lanes[(laneCursor + i) % 4]);
         }
       }
-
       t += beat / 2;
       beatsSinceJack += 0.5;
 
-      // 每 8 拍一次 jack：同軌連打 + 對稱雙押
       if (beatsSinceJack >= 8) {
         beatsSinceJack = 0;
         const jackLane = randLane();
-        // 4 連 1/4 拍 jack
         for (let j = 0; j < 4; j++) {
           const tt = t + j * (beat / 4);
           pushNote(tt, jackLane);
           if (Math.random() < 0.6) pushNote(tt, (jackLane + 2) % 4);
         }
-        t += beat; // jack 後拉開一拍
+        t += beat;
       }
     }
     else { // outro
@@ -523,14 +528,12 @@ function generateEXChartByBPM(bpm, offset, durationSec) {
       beatsSinceJack += (Math.random() < 0.5) ? 1 : 1.5;
     }
 
-    // 每 4 拍強拍加強（對齊 t 與起始）
     if (Math.abs(((t - start) / beat) % 4) < 0.01) {
       pushNote(t, 0);
       pushNote(t, 3);
     }
   }
 
-  // 不超出歌曲結尾太多
   chart = chart.filter(n => n.t <= endTime + 0.25);
 }
 
@@ -589,7 +592,6 @@ function render() {
     ctx.fillText(comboFlash, W / 2, H / 2 - 100);
   }
 
-  // 顯示結算（所有 note 已命中/漏接）
   if (!running && chart.every(n => n.hit)) {
     document.getElementById('finalScore').textContent = score;
     document.getElementById('statPerfect').textContent = stats.perfect;
@@ -611,7 +613,6 @@ function loop(ts) {
   checkRandomHit(t);
   render();
 
-  // 若所有 note 已處理完 → 結束
   if (chart.every(n => n.hit)) {
     running = false;
     lastJudgementText = 'END';
@@ -634,7 +635,7 @@ function loop(ts) {
 }
 
 /* ----------------------------
-   UI/流程
+   UI / 流程
 -----------------------------*/
 function showCountdown(callback) {
   const countdownText = document.getElementById('countdownText');
@@ -674,7 +675,7 @@ function startGame() {
   }
 
   try { bgm.pause(); } catch {}
-  bgm.currentTime = 0;  
+  bgm.currentTime = 0;
   cancelAnimationFrame(loopId);
 
   score = 0;
@@ -703,12 +704,9 @@ function startGame() {
 
   showCountdown(() => {
     startTime = performance.now();
-    
-    // ✅ 只有 EX 難度才播 bgm
-    if (difficulty === 'ex') {
-      bgm.currentTime = 0;
-      bgm.play();
-    }
+
+    // ✅ 每一種難度都會自動隨機選歌並播放
+    setSongAndPlay();
 
     loopId = requestAnimationFrame(loop);
   });
@@ -717,7 +715,7 @@ function startGame() {
 function pauseGame() {
   if (!running || paused) return;
   paused = true;
-  bgm.pause();
+  try { bgm.pause(); } catch {}
   cancelAnimationFrame(loopId);
   elapsedTimeBeforePause = (performance.now() - startTime) / 1000;
   document.getElementById('gameScreen').classList.add('blur');
@@ -734,7 +732,7 @@ function resumeGame() {
 
   showCountdown(() => {
     startTime = performance.now() - (elapsedTimeBeforePause * 1000);
-    bgm.play();
+    try { bgm.play(); } catch {}
     loopId = requestAnimationFrame(loop);
   });
 }
@@ -761,6 +759,7 @@ document.addEventListener("contextmenu", function(e) {
   </script>
 </body>
 </html>
+
 
 
 
