@@ -17,24 +17,9 @@
       display: block; margin: 20px auto; background: #1f2340; border: 2px solid #fff;
       width: 95%; max-width: 420px; height: auto; touch-action: manipulation;
     }
-  .hitbar {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-end;
-  width: 95%;
-  max-width: 420px;
-  height: 90px;
-  position: absolute;   /* 固定位置 */
-  left: 50%;
-  transform: translateX(-50%);
-  bottom: 0;            /* 預設在下方 */
-  z-index: 2;
-}
-
-.hitbar.up { 
-  top: 0;               /* 上升模式時移到頂部 */
-  bottom: auto;
-}
+    .hitbar {
+      display: flex; justify-content: space-between; align-items: flex-end;
+      width: 95%; max-width: 420px; margin: -90px auto 40px; height: 90px; position: relative; z-index: 2;
     }
     .hitkey {
       flex: 1; margin: 0 5px; height: 90px; border: 3px solid transparent; border-radius: 50%;
@@ -589,10 +574,6 @@
       currentDirection  = dir;
       currentJudgeMode  = jmode;
 
-        // ⬇⬇⬇ 這裡加上這段
-      const hitbarEl = document.querySelector('.hitbar');
-      hitbarEl.classList.toggle('up', currentDirection === 'up');
-
       let multiplier = parseFloat(speedMultiplierSelect.value);
       if      (difficulty === 'beginner') multiplier = 0.8;
       else if (difficulty === 'easy')     multiplier = 0.9;
@@ -694,6 +675,8 @@
   </script>
 </body>
 </html>
+
+
 
 
 
