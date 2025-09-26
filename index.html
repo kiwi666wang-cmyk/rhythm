@@ -589,6 +589,10 @@
       currentDirection  = dir;
       currentJudgeMode  = jmode;
 
+        // ⬇⬇⬇ 這裡加上這段
+      const hitbarEl = document.querySelector('.hitbar');
+      hitbarEl.classList.toggle('up', currentDirection === 'up');
+
       let multiplier = parseFloat(speedMultiplierSelect.value);
       if      (difficulty === 'beginner') multiplier = 0.8;
       else if (difficulty === 'easy')     multiplier = 0.9;
@@ -690,6 +694,7 @@
   </script>
 </body>
 </html>
+
 
 
 
