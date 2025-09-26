@@ -2,13 +2,12 @@
 <html lang="zh-Hant">
 <head>
   <meta charset="UTF-8" />
- <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <!-- 防縮放，行動裝置更穩 -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>DFJK 節奏遊戲</title>
   <link href="https://fonts.googleapis.com/css2?family=Fredoka+One&display=swap" rel="stylesheet">
-   <style>
-    html, body {
-      touch-action: manipulation;
-    }
+  <style>
+    html, body { touch-action: manipulation; }
     body {
       margin: 0;
       background: #0f1220;
@@ -17,9 +16,7 @@
       text-align: center;
       transition: background 0.5s ease;
     }
-    body.ex-mode {
-      background: linear-gradient(to bottom, #ff3300, #990000, #000000);
-    }
+    body.ex-mode { background: linear-gradient(to bottom, #ff3300, #990000, #000000); }
     canvas {
       display: block;
       margin: 20px auto;
@@ -31,82 +28,44 @@
       touch-action: manipulation;
     }
     .hitbar {
-      display: flex;
-      justify-content: space-between;
-      align-items: flex-end;
-      width: 95%;
-      max-width: 420px;
-      margin: -90px auto 40px;
-      height: 90px;
-      position: relative;
-      z-index: 2;
+      display: flex; justify-content: space-between; align-items: flex-end;
+      width: 95%; max-width: 420px; margin: -90px auto 40px; height: 90px;
+      position: relative; z-index: 2;
     }
     .hitkey {
-      flex: 1;
-      margin: 0 5px;
-      height: 90px;
-      border: 3px solid transparent;
-      border-radius: 50%;
-      background: rgba(255, 255, 255, 0.05);
-      font-size: 36px;
-      font-weight: bold;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      transition: transform 0.2s, box-shadow 0.2s;
-      user-select: none;
-      -webkit-user-select: none;
-      touch-action: manipulation;
+      flex: 1; margin: 0 5px; height: 90px; border: 3px solid transparent; border-radius: 50%;
+      background: rgba(255,255,255,0.05); font-size: 36px; font-weight: bold;
+      display: flex; align-items: center; justify-content: center;
+      transition: transform .2s, box-shadow .2s;
+      user-select: none; -webkit-user-select: none; touch-action: manipulation;
     }
     #key-d { color: #b266ff; border-color: #b266ff; }
     #key-f { color: #66ccff; border-color: #66ccff; }
     #key-j { color: #66ff66; border-color: #66ff66; }
     #key-k { color: #ff6666; border-color: #ff6666; }
-    .hitkey.flash {
-      transform: scale(1.4);
-      box-shadow: 0 0 20px currentColor;
-      background: rgba(255, 255, 255, 0.2);
-    }
-    .hud {
-      font-size: 18px;
-      margin-top: 10px;
-      line-height: 1.6;
-    }
-    .songline {
-      font-size: 14px;
-      opacity: 0.9;
-    }
+    .hitkey.flash { transform: scale(1.4); box-shadow: 0 0 20px currentColor; background: rgba(255,255,255,.2); }
+    .hud { font-size: 18px; margin-top: 10px; line-height: 1.6; }
+    .songline { font-size: 14px; opacity: .9; }
     button {
-      margin: 10px;
-      padding: 10px 20px;
-      font-size: 18px;
-      background: #78d5ff;
-      border: none;
-      border-radius: 8px;
-      cursor: pointer;
+      margin: 10px; padding: 10px 20px; font-size: 18px; background: #78d5ff;
+      border: none; border-radius: 8px; cursor: pointer;
     }
-    #menuScreen, #endScreen, #optionsScreen, #pauseScreen {
-      padding-top: 150px;
-    }
+    #menuScreen, #endScreen, #optionsScreen, #pauseScreen { padding-top: 150px; }
     .blur { filter: blur(6px); pointer-events: none; user-select: none; }
-    #pauseButton {
-      position: absolute; top: 10px; right: 10px; z-index: 3;
-    }
+    #pauseButton { position: absolute; top: 10px; right: 10px; z-index: 3; }
     .countdown {
-      position: absolute;
-      top: 40%; left: 50%;
-      transform: translate(-50%, -50%);
-      font-family: 'Fredoka One', sans-serif;
-      font-size: 72px; color: #fff;
-      text-shadow: 2px 2px 8px #000; z-index: 5;
-      animation: pop 0.6s ease-out;
-      pointer-events: none;
+      position: absolute; top: 40%; left: 50%; transform: translate(-50%, -50%);
+      font-family: 'Fredoka One', sans-serif; font-size: 72px; color: #fff;
+      text-shadow: 2px 2px 8px #000; z-index: 5; animation: pop .6s ease-out; pointer-events: none;
     }
     @keyframes pop {
-      0% { transform: scale(0.5) translate(-50%, -50%); opacity: 0; }
+      0% { transform: scale(.5) translate(-50%, -50%); opacity: 0; }
       50% { transform: scale(1.2) translate(-50%, -50%); opacity: 1; }
       100% { transform: scale(1) translate(-50%, -50%); opacity: 0; }
     }
+    .opt-row { margin: 10px 0; }
+    .opt-row label { margin-right: 6px; }
+    select { padding: 6px 8px; border-radius: 6px; border: 1px solid #444; background: #0f1220; color: #fff; }
   </style>
 </head>
 <body>
@@ -118,26 +77,47 @@
 
   <div id="optionsScreen" style="display:none;">
     <h2>⚙️ 遊戲選項</h2>
-    <label for="difficultySelect">難度：</label>
-    <select id="difficultySelect">
-      <option value="ex">EX（極限）</option>
-      <option value="hell">地獄</option>
-      <option value="hard">困難</option>
-      <option value="normal" selected>普通</option>
-      <option value="easy">簡單</option>
-      <option value="beginner">初學者</option>
-    </select>
-    <br><br>
-    <label for="speedMultiplier">速度倍率：</label>
-    <select id="speedMultiplier">
-      <option value="1">1.0x（標準）</option>
-      <option value="1.1">1.1x</option>
-      <option value="1.2">1.2x</option>
-      <option value="1.3">1.3x</option>
-      <option value="1.6">1.6x</option>
-      <option value="2.0">2.0x</option>
-    </select>
-    <br><br>
+
+    <div class="opt-row">
+      <label for="difficultySelect">難度：</label>
+      <select id="difficultySelect">
+        <option value="ex">EX（極限）</option>
+        <option value="hell">地獄</option>
+        <option value="hard">困難</option>
+        <option value="normal" selected>普通</option>
+        <option value="easy">簡單</option>
+        <option value="beginner">初學者</option>
+      </select>
+    </div>
+
+    <div class="opt-row">
+      <label for="speedMultiplier">速度倍率：</label>
+      <select id="speedMultiplier">
+        <option value="1">1.0x（標準）</option>
+        <option value="1.1">1.1x</option>
+        <option value="1.2">1.2x</option>
+        <option value="1.3">1.3x</option>
+        <option value="1.6">1.6x</option>
+        <option value="2.0">2.0x</option>
+      </select>
+    </div>
+
+    <div class="opt-row">
+      <label for="noteDirection">音符方向：</label>
+      <select id="noteDirection">
+        <option value="down" selected>下落打擊</option>
+        <option value="up">上升打擊</option>
+      </select>
+    </div>
+
+    <div class="opt-row">
+      <label for="inputMode">判定模式：</label>
+      <select id="inputMode">
+        <option value="new" selected>New input（不計 WRONG）</option>
+        <option value="old">Old input（有 WRONG 判定）</option>
+      </select>
+    </div>
+
     <button onclick="goToMenu()">回主選單</button>
   </div>
 
@@ -212,7 +192,7 @@ const bgm = document.getElementById('bgm');
 let baseNoteSpeed = 550;
 let noteSpeed = baseNoteSpeed;
 
-/* 判定窗口 & 參數（簡化 WRONG 機制，避免誤判） */
+/* 判定窗口 & 參數 */
 const JUDGE_WINDOW_MS = 200;
 const MISS_Y_OFFSET = 40;
 const TOUCH_WINDOW_MS = 200;
@@ -225,6 +205,16 @@ let stats = { perfect:0, great:0, good:0, bad:0, wrong:0, miss:0 };
 /* 當前歌曲/難度顯示 */
 let currentSongTitle = '-';
 let currentDifficulty = '-';
+
+/* 選項（方向/輸入模式） */
+function getNoteDirection() {
+  const el = document.getElementById('noteDirection');
+  return el ? el.value : 'down';
+}
+function getInputMode() {
+  const el = document.getElementById('inputMode');
+  return el ? el.value : 'new';
+}
 
 /* 隨機歌曲清單（請確保 /music 下檔名一致） */
 const SONGS = [
@@ -325,7 +315,6 @@ function generateChart(durationSec) {
   chart = [];
   const difficulty = document.getElementById('difficultySelect').value;
 
-  // 基礎隨機參數
   let time = 1;
   let doubleNoteChance = 0.35;
   let timeGapMin = 0.20;
@@ -345,7 +334,6 @@ function generateChart(durationSec) {
     doubleNoteChance = 0.60; timeGapMin = 0.12; timeGapMax = 0.30;
   }
 
-  // 非 EX/HELL：單純隨機
   if (!(difficulty === 'ex' || difficulty === 'hell')) {
     while (time < durationSec) {
       const lanesUsed = new Set();
@@ -374,42 +362,46 @@ function generateChart(durationSec) {
 
   while (t < durationSec) {
     if (difficulty === 'ex') {
-      // 基礎雙鍵 + 半拍穿插 + 偶發三連
       pushNote(t, nextLane());
-      if (Math.random() < 0.6) pushNote(t, (laneCursor + 2) % 4); // 雙鍵 60%
+      if (Math.random() < 0.6) pushNote(t, (laneCursor + 2) % 4); // 60% 雙鍵
       if (Math.random() < 0.35) pushNote(t + beat / 2, (laneCursor + 1) % 4);
       if (Math.random() < 0.18) {
         pushNote(t + beat / 3, randLane());
         pushNote(t + 2 * beat / 3, randLane());
       }
-      t += Math.random() < 0.5 ? beat / 2 : beat; // 半拍或一拍走
+      t += Math.random() < 0.5 ? beat / 2 : beat;
     } else {
       // HELL：雙鍵≥75%，更密，含 1/4 拍爆發
       pushNote(t, nextLane());
-      if (Math.random() < 0.85) pushNote(t, (laneCursor + 2) % 4); // 雙鍵 85%
+      if (Math.random() < 0.85) pushNote(t, (laneCursor + 2) % 4); // 85% 雙鍵
       pushNote(t + beat / 2, (laneCursor + 1) % 4);
       if (Math.random() < 0.4) {
         pushNote(t + beat / 4, randLane());
         pushNote(t + 3 * beat / 4, randLane());
       }
-      t += beat / 2; // 以半拍為步進，密度高
+      t += beat / 2;
     }
   }
 }
 
-/* ====== 更新 & 繪圖 ====== */
+/* ====== 更新 & 繪圖（支援上下兩種方向） ====== */
 function update(t) {
-  // 位置
+  const dir = getNoteDirection(); // 'down' | 'up'
+
   chart.forEach(n => {
-    n.y = judgeLineY - (n.t - t) * noteSpeed;
+    if (dir === 'down') {
+      n.y = judgeLineY - (n.t - t) * noteSpeed; // 上 -> 下
+    } else {
+      n.y = judgeLineY + (n.t - t) * noteSpeed; // 下 -> 上（由線下往上靠近）
+    }
   });
 
-  // 超線 → MISS
   chart.forEach(n => {
     if (n.hit) return;
-    if (n.y > judgeLineY + MISS_Y_OFFSET) {
-      n.hit = true;
-      miss();
+    if (getNoteDirection() === 'down') {
+      if (n.y > judgeLineY + MISS_Y_OFFSET) { n.hit = true; miss(); }
+    } else {
+      if (n.y < judgeLineY - MISS_Y_OFFSET) { n.hit = true; miss(); }
     }
   });
 }
@@ -446,7 +438,6 @@ function render() {
     ctx.fillText(comboFlash, W / 2, H / 2 - 100);
   }
 
-  // 全部打完 → 結算
   if (!running && chart.every(n => n.hit)) {
     document.getElementById('finalSong').textContent = currentSongTitle;
     document.getElementById('finalDiff').textContent = currentDifficulty.toUpperCase();
@@ -469,7 +460,6 @@ function loop(ts) {
   update(t);
   render();
 
-  // 全部 hit 或 miss 完 → 停
   if (chart.every(n => n.hit)) {
     running = false;
     lastJudgementText = 'END';
@@ -498,21 +488,14 @@ function loop(ts) {
 window.addEventListener('keydown', e => {
   const k = e.key.toLowerCase();
   const idx = keys.indexOf(k);
-  if (idx !== -1) {
-    pressLane(idx);
-  }
-  if (e.key === 'Escape') {
-    if (paused) resumeGame(); else pauseGame();
-  }
+  if (idx !== -1) pressLane(idx);
+  if (e.key === 'Escape') { if (paused) resumeGame(); else pauseGame(); }
 });
 
 // 點 hit 圓鍵（手機 + 桌面）
 ['d','f','j','k'].forEach((k, idx) => {
   const el = document.getElementById('key-' + k);
-  el.addEventListener('pointerdown', (e) => {
-    e.preventDefault();
-    pressLane(idx);
-  }, { passive: false });
+  el.addEventListener('pointerdown', (e) => { e.preventDefault(); pressLane(idx); }, { passive: false });
 });
 
 // 直接點 canvas 對應軌道（手機玩家好點）
@@ -527,7 +510,6 @@ canvas.addEventListener('pointerdown', (e) => {
 function pressLane(lane) {
   if (!running) return;
 
-  // 找最近可判定音符（該 lane、時間靠近）
   const tNow = (performance.now() - startTime) / 1000;
   let targetIndex = -1;
   let bestAbs = Infinity;
@@ -550,13 +532,18 @@ function pressLane(lane) {
     n.hit = true;
     flashKeyByLane(lane);
   } else {
-    // 不在窗口內的誤觸 → WRONG（簡化）
-    lastJudgementText = 'WRONG';
-    score = Math.max(0, score - 100);
-    combo = 0;
-    stats.wrong++;
-    updateHUD();
-    flashKeyByLane(lane);
+    // WRONG 判定僅在 Old input 模式才啟動
+    if (getInputMode() === 'old') {
+      lastJudgementText = 'WRONG';
+      score = Math.max(0, score - 100);
+      combo = 0;
+      stats.wrong++;
+      updateHUD();
+      flashKeyByLane(lane);
+    } else {
+      // New input：忽略不處罰
+      flashKeyByLane(lane);
+    }
   }
 }
 
@@ -611,11 +598,11 @@ function startGame() {
   bgm.src = url;
   bgm.load();
 
-  // 等 metadata 拿長度後 → 用歌曲完整時長產譜
-bgm.onloadedmetadata = () => {
-  const durationSec = (!isNaN(bgm.duration) && bgm.duration > 0) ? bgm.duration : 180;
-  generateChart(durationSec);
-    updateHUD(); // 顯示曲名/難度
+  // metadata 取得長度後 → 用歌曲完整時長產譜
+  bgm.onloadedmetadata = () => {
+    const durationSec = (!isNaN(bgm.duration) && bgm.duration > 0) ? bgm.duration : 180;
+    generateChart(durationSec);
+    updateHUD();
 
     // 顯示畫面
     document.getElementById('menuScreen').style.display = 'none';
@@ -629,14 +616,8 @@ bgm.onloadedmetadata = () => {
     showCountdown(() => {
       startTime = performance.now();
       bgm.currentTime = 0;
-      bgm.play().catch(()=>{}); // 行動裝置需互動；按「開始遊戲」已互動
+      bgm.play().catch(()=>{});
       loopId = requestAnimationFrame(loop);
-
-      // 在 2/3 時間點後把剩餘音符清掉避免「空白期」
-      setTimeout(() => {
-        const stopT = (performance.now() - startTime) / 1000;
-        chart.forEach(n => { if (!n.hit && n.t > stopT + 0.2) n.hit = true; });
-      }, durationSec * 1000);
     });
   };
 }
@@ -682,18 +663,15 @@ function showOptions() {
   document.getElementById('optionsScreen').style.display = 'block';
 }
 
-// 禁右鍵
-document.addEventListener("contextmenu", function(e) { e.preventDefault(); });
-// 防止 iOS / Android 縮放
-document.addEventListener('gesturestart', function (e) {
-  e.preventDefault();
-});
-document.addEventListener('dblclick', function (e) {
-  e.preventDefault();
-});
+/* 禁右鍵、禁縮放（iOS/Android） */
+document.addEventListener('contextmenu', e => e.preventDefault());
+document.addEventListener('gesturestart', e => e.preventDefault());
+document.addEventListener('dblclick', e => e.preventDefault());
   </script>
 </body>
 </html>
+
+
 
 
 
