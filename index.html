@@ -14,7 +14,6 @@
       text-align: center;
       touch-action: manipulation;
       transition: background 0.5s ease;
-      -webkit-tap-highlight-color: transparent;
     }
     body.ex-mode {
       background: linear-gradient(to bottom, #ff3300, #990000, #000000);
@@ -47,6 +46,8 @@
       position: relative;
       z-index: 2;
       user-select: none;
+      -webkit-user-select: none;
+      touch-action: manipulation;
     }
     .hitkey {
       flex: 1;
@@ -63,7 +64,6 @@
       transition: transform 0.2s, box-shadow 0.2s;
       user-select: none;
       -webkit-user-select: none;
-      touch-action: manipulation;
     }
     #key-d { color: #b266ff; border-color: #b266ff; }
     #key-f { color: #66ccff; border-color: #66ccff; }
@@ -87,6 +87,7 @@
       border: none;
       border-radius: 8px;
       cursor: pointer;
+      user-select: none;
     }
     #menuScreen, #endScreen, #optionsScreen, #pauseScreen {
       padding-top: 150px;
@@ -113,6 +114,7 @@
       text-shadow: 2px 2px 8px #000;
       z-index: 5;
       animation: pop 0.6s ease-out;
+      pointer-events: none;
       user-select: none;
     }
     @keyframes pop {
@@ -178,6 +180,7 @@
 
   <div id="endScreen" style="display: none;">
     <h2>🎮 遊戲結束！</h2>
+    <p>本局歌曲：<span id="songTitle">-</span></p>
     <p>分數：<span id="finalScore">0</span></p>
     <p>PERFECT：<span id="statPerfect">0</span></p>
     <p>GREAT：<span id="statGreat">0</span></p>
@@ -191,15 +194,12 @@
 
   <div id="countdownText" class="countdown" style="display:none;"></div>
 
-  <audio id="hitSound" src="https://cdn.pixabay.com/download/audio/2022/03/15/audio_6e3e3b6f3f.mp3?filename=click-124467.mp3"></audio>
-
-  <!-- 這個 src 會在開始遊戲時被覆蓋成隨機歌曲 -->
-  <audio id="bgm" src=""></audio>
+  <audio id="hitSound" src="https://cdn.pixabay.com/download/audio/2022/03/15/audio_6e3e3b6f3f.mp3?filename=click-124467.mp3" preload="auto"></audio>
+  <!-- ✅ 開局會自動隨機選歌並設定 src；為了手機播放，加上 playsinline -->
+  <audio id="bgm" src="" preload="metadata" playsinline></audio>
 
   <script>
-/* ----------------------------
-   Canvas 與基本設定
------------------------------*/
+/* ===================== Canvas & 常數 ===================== */
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 const W = canvas.width, H = canvas.height;
@@ -210,9 +210,6 @@ const judgeLineY = H - hitkeyHeight / 2;
 const keys = ['d','f','j','k'];
 const keyDown = new Set();
 
-/* ----------------------------
-   遊戲狀態變數
------------------------------*/
 let score = 0, combo = 0, lastJudgementText = '-';
 let startTime = 0, running = false;
 let chart = [];
@@ -222,103 +219,76 @@ let paused = false;
 let lastTouchTime = {};
 let elapsedTimeBeforePause = 0;
 
-/* ----------------------------
-   音效與歌曲
------------------------------*/
 const hitSound = document.getElementById('hitSound');
 const bgm = document.getElementById('bgm');
 let baseNoteSpeed = 550;
 let noteSpeed = baseNoteSpeed;
 
-/* ----------------------------
-   判定與防誤觸常數
------------------------------*/
+/* ---- 判定與錯誤冷卻 ---- */
 const JUDGE_WINDOW_MS = 200;
 const MISS_Y_OFFSET = 40;
 const WRONG_COOLDOWN_MS = 400;
 const TOUCH_WINDOW_MS = 200;
 const NEAR_WINDOW_MS = JUDGE_WINDOW_MS + 60;
 
-/* ----------------------------
-   統計 & 失敗一次性保險
------------------------------*/
+/* ---- 統計 ---- */
 let lastWrongTime = {};
 let missCount = 0;
 let gameOver = false;
 let stats = { perfect:0, great:0, good:0, bad:0, wrong:0, miss:0 };
 
-/* ----------------------------
-   EX 設定（保留原本）
------------------------------*/
-const EX_SONG_BPM = 140;
-const EX_OFFSET   = 1.0;
-let songDuration  = 215;
+/* ===================== 歌單（隨機） ===================== */
+const SONGS = [
+  { title: "Charlie Puth - Light Switch", file: "Charlie Puth - Light Switch [Official Music Video] - Charlie Puth.mp3", bpm: 120, offset: 0.8 },
+  { title: "Creepy Nuts - オトノケ (Otonoke)", file: "Creepy Nuts - オトノケ(Otonoke) 【Official MV】 [Dandadan OP] - Creepy Nuts.mp3", bpm: 172, offset: 0.6 },
+  { title: "Creepy Nuts - Mirage", file: "Creepy Nuts ”Mirage” × Anime ”Call of the Night” Collaboration Music Video Opening Theme Song - Creepy Nuts.mp3", bpm: 160, offset: 0.8 },
+  { title: "Creepy Nuts - Nemure", file: "Creepy Nuts ”Nemure” × Anime ”Call of the Night” Collaboration Music Video Ending Theme Song - Creepy Nuts (1).mp3", bpm: 150, offset: 0.6 },
+  { title: "Creepy Nuts - Bling-Bang-Bang-Born", file: "Creepy Nuts｢Bling-Bang-Bang-Born｣ × TV Anime｢マッシュル-MASHLE-｣ Collaboration Music Video #BBBBダンス - Creepy Nuts.mp3", bpm: 138, offset: 0.5 },
+  { title: "KANA-BOON - Silhouette", file: "KANA-BOON - Silhouette - KANABOONVEVO.mp3", bpm: 170, offset: 0.7 },
+  { title: "Lost Sky - Fearless pt.II (feat. Chris Linton)", file: "Lost Sky - Fearless pt.II (feat. Chris Linton) Trap NCS - Copyright Free Music - NoCopyrightSounds.mp3", bpm: 140, offset: 0.9 },
+  { title: "Lost Sky - Vision pt.II (feat. She Is Jules)", file: "Lost Sky - Vision pt. II (feat. She Is Jules) Future Trap NCS - Copyright Free Music - NoCopyrightSounds.mp3", bpm: 150, offset: 0.9 },
+  { title: "Lost Sky - Where We Started (feat. Jex)", file: "Lost Sky - Where We Started (feat. Jex) Melodic Dubstep NCS - Copyright Free Music - NoCopyrightSounds.mp3", bpm: 170, offset: 1.0 },
+  { title: "Lost Sky, Sara Skinner - Dreams pt.II", file: "Lost Sky, Sara Skinner - Dreams pt. II (feat. Sara Skinner) [NCS Release].mp3", bpm: 140, offset: 1.0 },
+  { title: "OneRepublic - Nobody (Kaiju No.8)", file: "OneRepublic - Nobody (from Kaiju No. 8) [Official Music Video] - OneRepublicVEVO.mp3", bpm: 130, offset: 0.8 },
+  { title: "YOASOBI - Watch me!", file: "YOASOBI「Watch me!」Official Music Video - Ayase _ YOASOBI.mp3", bpm: 170, offset: 0.7 },
+  { title: "yung kai - blue", file: "yung kai - blue (official music video) - yung kai.mp3", bpm: 120, offset: 0.9 },
+  { title: "AKASAKI - Bunny Girl", file: "【AKASAKI】Bunny Girl _ バニーガール（Lyric Video） - AKASAKI (19).mp3", bpm: 160, offset: 0.6 },
+  { title: "ゆーり - 隙", file: "【MV】隙_ゆーり【オリジナル】 - ゆーり🍎🐥〔24〕・yuri (1).mp3", bpm: 152, offset: 0.6 },
+  { title: "imase - NIGHT DANCER", file: "【imase】NIGHT DANCER（MV） - imase.mp3", bpm: 130, offset: 0.8 },
+  { title: "しぐれうい - 粛聖!! ロリ神レクイエム☆", file: "【オリジナル楽曲】粛聖!! ロリ神レクイエム☆ _ しぐれうい（9さい）【IOSYS（まろん&D.watt）】 - しぐれうい.mp3", bpm: 180, offset: 0.6 },
+  { title: "なとり - Overdose", file: "なとり - Overdose - なとり _ natori.mp3", bpm: 110, offset: 0.8 },
+  { title: "ロクデナシ - ただ声一つ", file: "ロクデナシ「ただ声一つ」_ Rokudenashi - One Voice【Official Music Video】 - ロクデナシ _ Rokudenashi.mp3", bpm: 145, offset: 0.8 },
+  { title: "ユイカ - 好きだから。", file: "好きだから。_ 『ユイカ』【MV】 - 『ユイカ』.mp3", bpm: 115, offset: 0.7 },
+  { title: "Eve - 廻廻奇譚", file: "廻廻奇譚 - Eve MV - Eve.mp3", bpm: 170, offset: 0.7 },
+  { title: "キタニタツヤ - 青のすみか", file: "青のすみか _ キタニタツヤ - Where Our Blue Is _ Tatsuya Kitani - キタニタツヤ _ Tatsuya Kitani.mp3", bpm: 160, offset: 0.8 },
+];
 
-/* 實際長度（載入後覆蓋） */
+let chosenSong = null;
+let songDuration = 180; // 將在 metadata 載入後改成原曲 * 2/3
+
+function pickRandomSong() {
+  const idx = Math.floor(Math.random() * SONGS.length);
+  chosenSong = SONGS[idx];
+  const src = 'music/' + encodeURI(chosenSong.file);
+  bgm.src = src;
+  document.getElementById('songTitle').textContent = chosenSong.title || '-';
+}
+
 bgm.addEventListener('loadedmetadata', () => {
   if (!isNaN(bgm.duration) && bgm.duration > 0) {
-    songDuration = bgm.duration;
+    songDuration = bgm.duration * (2/3);
+  } else {
+    songDuration = 120; // fallback
   }
 });
 
-/* ----------------------------
-   🎶 歌曲清單（放在 /music）
------------------------------*/
-const SONGS = [
-  "Charlie Puth - Light Switch [Official Music Video] - Charlie Puth.mp3",
-  "Creepy Nuts - オトノケ(Otonoke) 【Official MV】 [Dandadan OP] - Creepy Nuts.mp3",
-  "Creepy Nuts ”Mirage” × Anime ”Call of the Night” Collaboration Music Video Opening Theme Song - Creepy Nuts.mp3",
-  "Creepy Nuts ”Nemure” × Anime ”Call of the Night” Collaboration Music Video Ending Theme Song - Creepy Nuts (1).mp3",
-  "Creepy Nuts｢Bling-Bang-Bang-Born｣ × TV Anime｢マッシュル-MASHLE-｣ Collaboration Music Video #BBBBダンス - Creepy Nuts.mp3",
-  "KANA-BOON - Silhouette - KANABOONVEVO.mp3",
-  "Lost Sky - Fearless pt.II (feat. Chris Linton) Trap NCS - Copyright Free Music - NoCopyrightSounds.mp3",
-  "Lost Sky - Vision pt. II (feat. She Is Jules) Future Trap NCS - Copyright Free Music - NoCopyrightSounds.mp3",
-  "Lost Sky - Where We Started (feat. Jex) Melodic Dubstep NCS - Copyright Free Music - NoCopyrightSounds.mp3",
-  "Lost Sky, Sara Skinner - Dreams pt. II (feat. Sara Skinner) [NCS Release].mp3",
-  "OneRepublic - Nobody (from Kaiju No. 8) [Official Music Video] - OneRepublicVEVO.mp3",
-  "YOASOBI「Watch me!」Official Music Video - Ayase _ YOASOBI.mp3",
-  "yung kai - blue (official music video) - yung kai.mp3",
-  "【AKASAKI】Bunny Girl _ バニーガール（Lyric Video） - AKASAKI (19).mp3",
-  "【MV】隙_ゆーり【オリジナル】 - ゆーり🍎🐥〔24〕・yuri (1).mp3",
-  "【imase】NIGHT DANCER（MV） - imase.mp3",
-  "【オリジナル楽曲】粛聖!! ロリ神レクイエム☆ _ しぐれうい（9さい）【IOSYS（まろん&D.watt）】 - しぐれうい.mp3",
-  "なとり - Overdose - なとり _ natori.mp3",
-  "ロクデナシ「ただ声一つ」_ Rokudenashi - One Voice【Official Music Video】 - ロクデナシ _ Rokudenashi.mp3",
-  "好きだから。_ 『ユイカ』【MV】 - 『ユイカ』.mp3",
-  "廻廻奇譚 - Eve MV - Eve.mp3",
-  "青のすみか _ キタニタツヤ - Where Our Blue Is _ Tatsuya Kitani - キタニタツヤ _ Tatsuya Kitani.mp3"
-];
-
-/* 隨機挑歌並設 src */
-function pickRandomSong() {
-  const song = SONGS[Math.floor(Math.random() * SONGS.length)];
-  bgm.src = "music/" + encodeURIComponent(song);
-  // 重新載入並把時間歸零
-  try { bgm.load(); } catch(e) {}
-  bgm.currentTime = 0;
-}
-
-/* ----------------------------
-   📱 行動裝置音訊解鎖
------------------------------*/
-document.body.addEventListener("touchstart", () => {
-  bgm.play().then(() => {
-    bgm.pause();
-    bgm.currentTime = 0;
-  }).catch(e => console.log("音訊解鎖失敗：", e));
-}, { once: true });
-
-/* ----------------------------
-   鍵盤事件
------------------------------*/
+/* ===================== 鍵盤 & 觸控 ===================== */
 window.addEventListener('keydown', e => {
   const k = e.key.toLowerCase();
-  if (keys.includes(k)) {
-    keyDown.add(k);
-    processPress(k);
-  }
+  if (keys.includes(k)) keyDown.add(k);
   if (e.key === 'Escape') {
-    if (paused) resumeGame(); else pauseGame();
+    if (paused) resumeGame();
+    else pauseGame();
   }
 });
 window.addEventListener('keyup', e => {
@@ -326,28 +296,30 @@ window.addEventListener('keyup', e => {
   if (keys.includes(k)) keyDown.delete(k);
 });
 
-/* ----------------------------
-   觸控事件（點擊圓鍵）
------------------------------*/
+// 圓鍵 touch（手機）
 keys.forEach(k => {
   const el = document.getElementById('key-' + k);
   el.addEventListener('touchstart', e => {
     e.preventDefault();
     const now = Date.now();
-    if (lastTouchTime[k] && now - lastTouchTime[k] < 80) return;
+    if (lastTouchTime[k] && now - lastTouchTime[k] < 100) return;
     lastTouchTime[k] = now;
     processPress(k);
   }, { passive: false });
-  // 滑鼠也支援點擊
-  el.addEventListener('mousedown', e => {
-    e.preventDefault();
-    processPress(k);
-  });
 });
 
-/* ----------------------------
-   HUD & 特效
------------------------------*/
+// 整條 hitbar 都可點（手機操作更好壓）
+const hitbarEl = document.querySelector('.hitbar');
+hitbarEl.addEventListener('pointerdown', (e) => {
+  e.preventDefault();
+  const rect = hitbarEl.getBoundingClientRect();
+  const x = e.clientX - rect.left;
+  const lane = Math.min(3, Math.max(0, Math.floor(x / (rect.width / 4))));
+  const k = keys[lane];
+  processPress(k);
+}, { passive: false });
+
+/* ===================== HUD/動畫 ===================== */
 function updateHUD() {
   document.getElementById('score').textContent = score;
   document.getElementById('combo').textContent = combo;
@@ -360,68 +332,65 @@ function flashKey(k) {
   setTimeout(() => el.classList.remove('flash'), 150);
 }
 
-/* ----------------------------
-   判定邏輯
------------------------------*/
+/* ===================== 判定 ===================== */
 function judge(dtMs, laneKey) {
   const adt = Math.abs(dtMs);
   let j = 'GOOD', add = 300;
 
   if (adt <= 50)      { j = 'PERFECT'; add = 1000; stats.perfect++; }
-  else if (adt <= 100){ j = 'GREAT';   add = 600;  stats.great++;   }
-  else if (adt <= 150){ j = 'GOOD';    add = 300;  stats.good++;    }
-  else                { j = 'BAD';     add = 100;  stats.bad++;     }
+  else if (adt <= 100){ j = 'GREAT';   add =  600; stats.great++;   }
+  else if (adt <= 150){ j = 'GOOD';    add =  300; stats.good++;    }
+  else                { j = 'BAD';     add =  100; stats.bad++;     }
 
   score += add;
   combo += 1;
   lastJudgementText = j;
   updateHUD();
-  try { hitSound.currentTime = 0; hitSound.play(); } catch(e) {}
+  hitSound.currentTime = 0;
+  hitSound.play();
   flashKey(laneKey);
   if (combo % 10 === 0) {
     comboFlash = `COMBO x${combo}!!`;
     setTimeout(() => comboFlash = '', 800);
   }
 }
-
 function miss() {
   lastJudgementText = 'MISS';
   combo = 0;
   missCount++;
   stats.miss++;
   updateHUD();
-
   const difficulty = document.getElementById('difficultySelect').value;
   if (difficulty === 'ex' && missCount > 15) {
     triggerFailOnce('你輸了！Miss 超過 15 次');
   }
 }
-
 function triggerFailOnce(msg) {
   if (gameOver) return;
   gameOver = true;
   running = false;
   try { cancelAnimationFrame(loopId); } catch {}
   try { bgm.pause(); } catch {}
-  setTimeout(() => { alert(msg); goToMenu(); }, 0);
+  setTimeout(() => {
+    alert(msg);
+    goToMenu();
+  }, 0);
 }
 
-/* 錯鍵處罰（不計入 MISS），加入近拍保護 */
+// 錯鍵處罰（WRONG）
 function checkRandomHit(t) {
   const nowMs = performance.now();
   keys.forEach(k => {
     if (!keyDown.has(k)) return;
     const lane = keys.indexOf(k);
-
     const hasValidNote = chart.some(n =>
       !n.hit && n.lane === lane && Math.abs((t - n.t) * 1000) <= JUDGE_WINDOW_MS
     );
     const hasNearNote = chart.some(n =>
       !n.hit && n.lane === lane && Math.abs((t - n.t) * 1000) <= NEAR_WINDOW_MS
     );
-
     if (!hasValidNote) {
-      if (hasNearNote) return; // 近拍保護：提早壓不扣
+      if (hasNearNote) return;
       if (!lastWrongTime[k] || nowMs - lastWrongTime[k] > WRONG_COOLDOWN_MS) {
         lastWrongTime[k] = nowMs;
         lastJudgementText = 'WRONG';
@@ -436,175 +405,101 @@ function checkRandomHit(t) {
   });
 }
 
-/* 主動按鍵處理（鍵盤/觸控/滑鼠統一） */
-function processPress(k) {
-  if (!running) return;
-  const nowT = (performance.now() - startTime) / 1000;
-  let nearest = null;
-  let bestAbs = Infinity;
-  for (let i = 0; i < chart.length; i++) {
-    const n = chart[i];
-    if (n.hit) continue;
-    if (keys[n.lane] !== k) continue;
-    const absDt = Math.abs((nowT - n.t) * 1000);
-    if (absDt <= TOUCH_WINDOW_MS && absDt < bestAbs) {
-      bestAbs = absDt;
-      nearest = n;
-    }
-  }
-  if (nearest) {
-    judge((nowT - nearest.t) * 1000, k);
-    nearest.hit = true;
-  } else {
-    const nowMs = performance.now();
-    if (!lastWrongTime[k] || nowMs - lastWrongTime[k] > WRONG_COOLDOWN_MS) {
-      lastWrongTime[k] = nowMs;
-      lastJudgementText = 'WRONG';
-      score = Math.max(0, score - 100);
-      combo = 0;
-      stats.wrong++;
-      updateHUD();
-      flashKey(k);
-    }
+/* ===================== 譜面生成（BPM 驅動的隨機） ===================== */
+function getDifficultyProfile(level, bpm) {
+  const bpmFactor = Math.min(1.6, Math.max(0.85, bpm / 140));
+  switch (level) {
+    case 'beginner':
+      return { beatDiv: 1.0, doubleChance: 0.10, tripleChance: 0.0,  jackEveryBeats: 16, chaos: 0.05, bpmFactor };
+    case 'easy':
+      return { beatDiv: 1.0, doubleChance: 0.18, tripleChance: 0.05, jackEveryBeats: 16, chaos: 0.08, bpmFactor };
+    case 'normal':
+      return { beatDiv: 0.5, doubleChance: 0.25, tripleChance: 0.10, jackEveryBeats: 12, chaos: 0.10, bpmFactor };
+    case 'hard':
+      return { beatDiv: 0.5, doubleChance: 0.45, tripleChance: 0.18, jackEveryBeats: 10, chaos: 0.12, bpmFactor };
+    case 'ex':
+      return { beatDiv: 0.5, doubleChance: 0.58, tripleChance: 0.25, jackEveryBeats: 8,  chaos: 0.16, bpmFactor };
+    case 'hell': // 比 EX 更難，雙鍵≥75%
+      return { beatDiv: 0.5, doubleChance: 0.78, tripleChance: 0.33, jackEveryBeats: 6,  chaos: 0.22, bpmFactor };
+    default:
+      return { beatDiv: 0.5, doubleChance: 0.35, tripleChance: 0.15, jackEveryBeats: 12, chaos: 0.1, bpmFactor };
   }
 }
 
-/* ----------------------------
-   譜面生成（保留你的版本）
------------------------------*/
 function generateChart() {
   chart = [];
-  const difficulty = document.getElementById('difficultySelect').value;
+  const level = document.getElementById('difficultySelect').value;
+  if (!chosenSong) pickRandomSong();
 
-  if (difficulty !== 'ex') {
-    // 原本隨機譜面（非 EX）
-    let time = 1;
-    const endTime = Math.random() * 20 + 110;
-    let doubleNoteChance = 0.35;
-    let timeGapMin = 0.2;
-    let timeGapMax = 0.45;
+  const bpm = chosenSong?.bpm || 140;
+  const offset = Math.max(0, chosenSong?.offset ?? 1.0);
 
-    if (difficulty === 'beginner') {
-      doubleNoteChance = 0.2; timeGapMin = 0.3;  timeGapMax = 0.6;
-    } else if (difficulty === 'easy') {
-      doubleNoteChance = 0.2; timeGapMin = 0.25; timeGapMax = 0.5;
-    } else if (difficulty === 'normal') {
-      doubleNoteChance = 0.35; timeGapMin = 0.2; timeGapMax = 0.45;
-    } else if (difficulty === 'hard') {
-      doubleNoteChance = 0.6; timeGapMin = 0.15; timeGapMax = 0.35;
-    } else if (difficulty === 'hell') {
-      doubleNoteChance = 0.9; timeGapMin = 0.1;  timeGapMax = 0.25;
-    }
-
-    while (time < endTime) {
-      const lanesUsed = new Set();
-      const notesThisFrame = [];
-      const count = Math.random() < doubleNoteChance ? 2 : 1;
-      while (notesThisFrame.length < count) {
-        const lane = Math.floor(Math.random() * 4);
-        if (!lanesUsed.has(lane)) {
-          lanesUsed.add(lane);
-          notesThisFrame.push({ t: time, lane, type: 'tap', hit: false, y: -50 });
-        }
-      }
-      chart.push(...notesThisFrame);
-      time += Math.random() * (timeGapMax - timeGapMin) + timeGapMin;
-    }
-    return;
-  }
-
-  // EX：依 BPM + 分段產生
-  generateEXChartByBPM(EX_SONG_BPM, EX_OFFSET, songDuration);
-}
-
-function generateEXChartByBPM(bpm, offset, durationSec) {
   const beat = 60 / bpm;
-  const start = Math.max(0, offset);
-  const endTime = start + durationSec;
+  const profile = getDifficultyProfile(level, bpm);
+  const unit = beat * profile.beatDiv / profile.bpmFactor;
 
-  const introEnd  = start + durationSec * 0.28;
-  const chorusEnd = start + durationSec * 0.56;
-  const dropEnd   = start + durationSec * 0.84;
+  const start = offset;
+  const endTime = Math.max(start + 5, start + songDuration);
+  const randLane = () => Math.floor(Math.random() * 4);
+  const pushNote = (time, lane) => chart.push({ t: time, lane, type: 'tap', hit: false, y: -50 });
 
   let t = start;
-
-  const pushNote = (time, lane) => chart.push({ t: time, lane, type: 'tap', hit: false, y: -50 });
-  const randLane = () => Math.floor(Math.random() * 4);
-
   let laneCursor = 0;
   const nextLane = () => { laneCursor = (laneCursor + 1) % 4; return laneCursor; };
-
   let beatsSinceJack = 0;
 
   while (t <= endTime) {
-    let section = (t < introEnd) ? 'intro' : (t < chorusEnd) ? 'chorus' : (t < dropEnd) ? 'drop' : 'outro';
+    pushNote(t, nextLane());
 
-    if (section === 'intro') {
-      pushNote(t, nextLane());
-      if (Math.random() < 0.18) pushNote(t, (laneCursor + 2) % 4);
-      t += (Math.random() < 0.35) ? beat / 2 : beat;
-      beatsSinceJack += (Math.random() < 0.35) ? 0.5 : 1;
+    if (Math.random() < profile.doubleChance) {
+      pushNote(t, (laneCursor + 2) % 4);
     }
-    else if (section === 'chorus') {
-      pushNote(t, nextLane());
-      pushNote(t, (laneCursor + 1) % 4);
-      if (Math.random() < 0.25) pushNote(t + beat / 2, (laneCursor + 2) % 4);
-      if (Math.random() < 0.18) {
-        pushNote(t + beat / 3, randLane());
-        pushNote(t + 2 * beat / 3, randLane());
+    if (Math.random() < profile.tripleChance) {
+      pushNote(t + unit / 3, randLane());
+      pushNote(t + 2 * unit / 3, randLane());
+    }
+    if (Math.random() < 0.35 + profile.chaos * 0.5) {
+      pushNote(t + unit / 2, nextLane());
+      if (Math.random() < profile.doubleChance * 0.5) {
+        pushNote(t + unit / 2, (laneCursor + 2) % 4);
       }
-      t += beat / 2;
-      beatsSinceJack += 0.5;
     }
-    else if (section === 'drop') {
-      pushNote(t, randLane());
-      pushNote(t + beat / 3, (laneCursor + 1) % 4);
-      pushNote(t + 2 * beat / 3, (laneCursor + 2) % 4);
-
-      if (Math.random() < 0.55) pushNote(t, (laneCursor + 3) % 4);
-
-      if (Math.random() < 0.5) pushNote(t + beat / 2, nextLane());
-
-      if (Math.random() < 0.35) {
-        const lanes = [0,1,2,3];
-        for (let i = 1; i <= 3; i++) {
-          pushNote(t + i * (beat / 4), lanes[(laneCursor + i) % 4]);
+    if (Math.random() < profile.chaos * 0.6) {
+      for (let i = 1; i <= 3; i++) {
+        pushNote(t + i * (unit / 4), (laneCursor + i) % 4);
+        if (level === 'hell' && Math.random() < 0.5) {
+          pushNote(t + i * (unit / 4), ((laneCursor + i) % 4 + 2) % 4);
         }
       }
+    }
 
-      t += beat / 2;
-      beatsSinceJack += 0.5;
-
-      if (beatsSinceJack >= 8) {
-        beatsSinceJack = 0;
-        const jackLane = randLane();
-        for (let j = 0; j < 4; j++) {
-          const tt = t + j * (beat / 4);
-          pushNote(tt, jackLane);
-          if (Math.random() < 0.6) pushNote(tt, (jackLane + 2) % 4);
+    beatsSinceJack += profile.beatDiv / profile.bpmFactor;
+    if (beatsSinceJack >= profile.jackEveryBeats) {
+      beatsSinceJack = 0;
+      const jackLane = randLane();
+      for (let j = 0; j < 4; j++) {
+        const tt = t + j * (unit / 2);
+        pushNote(tt, jackLane);
+        if (Math.random() < profile.doubleChance) {
+          pushNote(tt, (jackLane + 2) % 4);
         }
-        t += beat;
       }
-    }
-    else { // outro
-      pushNote(t, nextLane());
-      if (Math.random() < 0.12) pushNote(t, (laneCursor + 2) % 4);
-      t += (Math.random() < 0.5) ? beat : beat * 1.5;
-      beatsSinceJack += (Math.random() < 0.5) ? 1 : 1.5;
+      t += unit; // jack 後微拉開
+      continue;
     }
 
-    if (Math.abs(((t - start) / beat) % 4) < 0.01) {
+    if (Math.random() < 0.22) {
       pushNote(t, 0);
       pushNote(t, 3);
     }
+
+    t += unit;
   }
 
   chart = chart.filter(n => n.t <= endTime + 0.25);
 }
 
-/* ----------------------------
-   遊戲主迴圈 & 繪圖
------------------------------*/
+/* ===================== 遊戲主迴圈 ===================== */
 function update(t) {
   chart.forEach(n => {
     n.y = judgeLineY - (n.t - t) * noteSpeed;
@@ -674,15 +569,22 @@ function render() {
 function loop(ts) {
   if (paused) return;
   const t = (ts - startTime) / 1000;
+
+  // 若超過可遊玩時長（原曲 2/3），直接結束並停歌
+  const limit = (chosenSong?.offset ?? 1.0) + songDuration + 0.1;
+  if (t >= limit) {
+    running = false;
+    try { bgm.pause(); } catch {}
+  }
+
   update(t);
   checkRandomHit(t);
   render();
 
-  if (chart.every(n => n.hit)) {
+  if (!running || chart.every(n => n.hit)) {
     running = false;
     lastJudgementText = 'END';
     updateHUD();
-
     document.getElementById('finalScore').textContent = score;
     document.getElementById('statPerfect').textContent = stats.perfect;
     document.getElementById('statGreat').textContent = stats.great;
@@ -699,14 +601,11 @@ function loop(ts) {
   loopId = requestAnimationFrame(loop);
 }
 
-/* ----------------------------
-   UI/流程
------------------------------*/
+/* ===================== UI/流程 ===================== */
 function showCountdown(callback) {
   const countdownText = document.getElementById('countdownText');
   const steps = ['Ready', '3', '2', '1', 'Go!'];
   let i = 0;
-
   function nextStep() {
     if (i >= steps.length) {
       countdownText.style.display = 'none';
@@ -721,12 +620,12 @@ function showCountdown(callback) {
     i++;
     setTimeout(nextStep, 700);
   }
-
   nextStep();
 }
 
 function startGame() {
-  pickRandomSong(); // 🎶 每局開場隨機歌曲
+  // 每次開局都抽一首歌
+  pickRandomSong();
 
   const difficulty = document.getElementById('difficultySelect').value;
   const speedMultiplierSelect = document.getElementById('speedMultiplier');
@@ -734,9 +633,13 @@ function startGame() {
   if (difficulty === 'beginner') multiplier = 0.8;
   else if (difficulty === 'easy')  multiplier = 0.9;
   else if (difficulty === 'ex')    multiplier = 1.8;
+  else if (difficulty === 'hell')  multiplier = 2.0;
   noteSpeed = baseNoteSpeed * multiplier;
 
-  document.body.classList.toggle('ex-mode', difficulty === 'ex');
+  document.body.classList.remove('ex-mode');
+  if (difficulty === 'ex' || difficulty === 'hell') {
+    document.body.classList.add('ex-mode');
+  }
 
   try { bgm.pause(); } catch {}
   bgm.currentTime = 0;
@@ -768,9 +671,8 @@ function startGame() {
 
   showCountdown(() => {
     startTime = performance.now();
-    // ✅ 所有難度都播放音樂
     bgm.currentTime = 0;
-    bgm.play().catch(e => console.log('play 失敗：', e));
+    bgm.play().catch(()=>{});
     loopId = requestAnimationFrame(loop);
   });
 }
@@ -795,7 +697,7 @@ function resumeGame() {
 
   showCountdown(() => {
     startTime = performance.now() - (elapsedTimeBeforePause * 1000);
-    bgm.play().catch(e => console.log('resume play 失敗：', e));
+    bgm.play().catch(()=>{});
     loopId = requestAnimationFrame(loop);
   });
 }
@@ -816,12 +718,15 @@ function showOptions() {
   document.getElementById('optionsScreen').style.display = 'block';
 }
 
-/* 停用長按選單與雙指縮放等干擾 */
-document.addEventListener("contextmenu", e => e.preventDefault());
-document.addEventListener("gesturestart", e => e.preventDefault());
+/* 禁止長按選單 */
+document.addEventListener("contextmenu", function(e) {
+  e.preventDefault();
+});
   </script>
 </body>
 </html>
+
+
 
 
 
