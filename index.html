@@ -14,17 +14,9 @@
       text-align: center;
       touch-action: manipulation;
       transition: background 0.5s ease;
-      -webkit-tap-highlight-color: transparent;
     }
     body.ex-mode {
       background: linear-gradient(to bottom, #ff3300, #990000, #000000);
-    }
-    body.ex-flash {
-      animation: exFlash 0.3s ease;
-    }
-    @keyframes exFlash {
-      0% { background: #ff4444; }
-      100% { background: linear-gradient(to bottom, #ff3300, #990000, #000000); }
     }
     canvas {
       display: block;
@@ -34,7 +26,7 @@
       width: 95%;
       max-width: 420px;
       height: auto;
-      touch-action: none;
+      touch-action: manipulation;
     }
     .hitbar {
       display: flex;
@@ -46,7 +38,6 @@
       height: 90px;
       position: relative;
       z-index: 2;
-      user-select: none;
     }
     .hitkey {
       flex: 1;
@@ -77,7 +68,6 @@
     .hud {
       font-size: 18px;
       margin-top: 10px;
-      user-select: none;
     }
     button {
       margin: 10px;
@@ -91,29 +81,19 @@
     #menuScreen, #endScreen, #optionsScreen, #pauseScreen {
       padding-top: 150px;
     }
-    .blur {
-      filter: blur(6px);
-      pointer-events: none;
-      user-select: none;
-    }
+    .blur { filter: blur(6px); pointer-events: none; user-select: none; }
     #pauseButton {
-      position: absolute;
-      top: 10px;
-      right: 10px;
-      z-index: 3;
+      position: absolute; top: 10px; right: 10px; z-index: 3;
     }
     .countdown {
       position: absolute;
-      top: 40%;
-      left: 50%;
+      top: 40%; left: 50%;
       transform: translate(-50%, -50%);
       font-family: 'Fredoka One', sans-serif;
-      font-size: 72px;
-      color: #fff;
-      text-shadow: 2px 2px 8px #000;
-      z-index: 5;
+      font-size: 72px; color: #fff;
+      text-shadow: 2px 2px 8px #000; z-index: 5;
       animation: pop 0.6s ease-out;
-      user-select: none;
+      pointer-events: none;
     }
     @keyframes pop {
       0% { transform: scale(0.5) translate(-50%, -50%); opacity: 0; }
@@ -166,7 +146,8 @@
     <div class="hud">
       分數：<span id="score">0</span>　
       連擊：<span id="combo">0</span>　
-      判定：<span id="judgement">-</span>
+      判定：<span id="judgement">-</span>　
+      MISS：<span id="missCount">0</span>
     </div>
   </div>
 
@@ -192,14 +173,10 @@
   <div id="countdownText" class="countdown" style="display:none;"></div>
 
   <audio id="hitSound" src="https://cdn.pixabay.com/download/audio/2022/03/15/audio_6e3e3b6f3f.mp3?filename=click-124467.mp3"></audio>
-
-  <!-- 這個 src 會在開始遊戲時被覆蓋成隨機歌曲 -->
-  <audio id="bgm" src=""></audio>
+  <audio id="bgm"></audio>
 
   <script>
-/* ----------------------------
-   Canvas 與基本設定
------------------------------*/
+/* ========= 基本參數 ========= */
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 const W = canvas.width, H = canvas.height;
@@ -208,63 +185,32 @@ const hitkeyHeight = 90;
 const judgeLineY = H - hitkeyHeight / 2;
 
 const keys = ['d','f','j','k'];
-const keyDown = new Set();
 
-/* ----------------------------
-   遊戲狀態變數
------------------------------*/
 let score = 0, combo = 0, lastJudgementText = '-';
 let startTime = 0, running = false;
 let chart = [];
 let comboFlash = '';
 let loopId = null;
 let paused = false;
-let lastTouchTime = {};
-let keySafeUntil = {};
 let elapsedTimeBeforePause = 0;
 
-/* ----------------------------
-   音效與歌曲
------------------------------*/
 const hitSound = document.getElementById('hitSound');
 const bgm = document.getElementById('bgm');
+
 let baseNoteSpeed = 550;
 let noteSpeed = baseNoteSpeed;
 
-/* ----------------------------
-   判定與防誤觸常數
------------------------------*/
+/* 判定窗口 & 參數（簡化 WRONG 機制，避免誤判） */
 const JUDGE_WINDOW_MS = 200;
 const MISS_Y_OFFSET = 40;
-const WRONG_COOLDOWN_MS = 400;
 const TOUCH_WINDOW_MS = 200;
-const NEAR_WINDOW_MS = JUDGE_WINDOW_MS + 60;
 
-/* ----------------------------
-   統計 & 失敗一次性保險
------------------------------*/
-let lastWrongTime = {};
+/* 統計 */
 let missCount = 0;
 let gameOver = false;
 let stats = { perfect:0, great:0, good:0, bad:0, wrong:0, miss:0 };
 
-/* ----------------------------
-   EX 設定（保留原本）
------------------------------*/
-const EX_SONG_BPM = 140;
-const EX_OFFSET   = 1.0;
-let songDuration  = 215;
-
-/* 實際長度（載入後覆蓋） */
-bgm.addEventListener('loadedmetadata', () => {
-  if (!isNaN(bgm.duration) && bgm.duration > 0) {
-    songDuration = bgm.duration;
-  }
-});
-
-/* ----------------------------
-   🎶 歌曲清單（放在 /music）
------------------------------*/
+/* 隨機歌曲清單（請確保 /music 下檔名一致） */
 const SONGS = [
   "Charlie Puth - Light Switch [Official Music Video] - Charlie Puth.mp3",
   "Creepy Nuts - オトノケ(Otonoke) 【Official MV】 [Dandadan OP] - Creepy Nuts.mp3",
@@ -272,9 +218,9 @@ const SONGS = [
   "Creepy Nuts ”Nemure” × Anime ”Call of the Night” Collaboration Music Video Ending Theme Song - Creepy Nuts (1).mp3",
   "Creepy Nuts｢Bling-Bang-Bang-Born｣ × TV Anime｢マッシュル-MASHLE-｣ Collaboration Music Video #BBBBダンス - Creepy Nuts.mp3",
   "KANA-BOON - Silhouette - KANABOONVEVO.mp3",
-   "Lost Sky - Fearless pt.II (feat. Chris Linton)  Trap  NCS - Copyright Free Music - NoCopyrightSounds.mp3",
-  "Lost Sky - Vision pt. II (feat. She Is Jules)  Future Trap  NCS - Copyright Free Music - NoCopyrightSounds.mp3",
-  "Lost Sky - Where We Started (feat. Jex)  Melodic Dubstep  NCS - Copyright Free Music - NoCopyrightSounds.mp3",
+  "Lost Sky - Fearless pt.II (feat. Chris Linton) Trap NCS - Copyright Free Music - NoCopyrightSounds.mp3",
+  "Lost Sky - Vision pt. II (feat. She Is Jules) Future Trap NCS - Copyright Free Music - NoCopyrightSounds.mp3",
+  "Lost Sky - Where We Started (feat. Jex) Melodic Dubstep NCS - Copyright Free Music - NoCopyrightSounds.mp3",
   "Lost Sky, Sara Skinner - Dreams pt. II (feat. Sara Skinner) [NCS Release].mp3",
   "OneRepublic - Nobody (from Kaiju No. 8) [Official Music Video] - OneRepublicVEVO.mp3",
   "YOASOBI「Watch me!」Official Music Video - Ayase _ YOASOBI.mp3",
@@ -290,223 +236,82 @@ const SONGS = [
   "青のすみか _ キタニタツヤ - Where Our Blue Is _ Tatsuya Kitani - キタニタツヤ _ Tatsuya Kitani.mp3"
 ];
 
-/* 隨機挑歌並設 src */
-function pickRandomSong() {
-  const song = SONGS[Math.floor(Math.random() * SONGS.length)];
-  bgm.src = "music/" + encodeURIComponent(song);
-  // 重新載入並把時間歸零
-  try { bgm.load(); } catch(e) {}
-  bgm.currentTime = 0;
-}
-
-/* ----------------------------
-   📱 行動裝置音訊解鎖
------------------------------*/
-document.body.addEventListener("touchstart", () => {
-  bgm.play().then(() => {
-    bgm.pause();
-    bgm.currentTime = 0;
-  }).catch(e => console.log("音訊解鎖失敗：", e));
-}, { once: true });
-
-/* ----------------------------
-   鍵盤事件
------------------------------*/
-window.addEventListener('keydown', e => {
-  const k = e.key.toLowerCase();
-  if (keys.includes(k)) {
-    keyDown.add(k);
-    processPress(k);
-  }
-  if (e.key === 'Escape') {
-    if (paused) resumeGame(); else pauseGame();
-  }
-});
-window.addEventListener('keyup', e => {
-  const k = e.key.toLowerCase();
-  if (keys.includes(k)) {
-    keyDown.delete(k);
-    delete keySafeUntil[k];
-  }
-});
-
-/* ----------------------------
-   觸控事件（點擊圓鍵）
------------------------------*/
-keys.forEach(k => {
-  const el = document.getElementById('key-' + k);
-  el.addEventListener('touchstart', e => {
-    e.preventDefault();
-    const now = Date.now();
-    if (lastTouchTime[k] && now - lastTouchTime[k] < 80) return;
-    lastTouchTime[k] = now;
-    processPress(k);
-  }, { passive: false });
-  // 滑鼠也支援點擊
-  el.addEventListener('mousedown', e => {
-    e.preventDefault();
-    processPress(k);
-  });
-});
-
-/* ----------------------------
-   HUD & 特效
------------------------------*/
+/* ====== 輔助：更新 HUD ====== */
 function updateHUD() {
   document.getElementById('score').textContent = score;
   document.getElementById('combo').textContent = combo;
   document.getElementById('judgement').textContent = lastJudgementText;
-}
-function flashKey(k) {
-  const el = document.getElementById('key-' + k);
-  if (!el) return;
-  el.classList.add('flash');
-  setTimeout(() => el.classList.remove('flash'), 150);
+  document.getElementById('missCount').textContent = missCount;
 }
 
-/* ----------------------------
-   判定邏輯
------------------------------*/
-function judge(dtMs, laneKey) {
+/* ====== 視覺：按鍵亮起 ====== */
+function flashKeyByLane(laneIdx) {
+  const id = ['d','f','j','k'][laneIdx];
+  const el = document.getElementById('key-' + id);
+  if (!el) return;
+  el.classList.add('flash');
+  setTimeout(() => el.classList.remove('flash'), 120);
+}
+
+/* ====== 判定 ====== */
+function judge(dtMs) {
   const adt = Math.abs(dtMs);
   let j = 'GOOD', add = 300;
 
   if (adt <= 50)      { j = 'PERFECT'; add = 1000; stats.perfect++; }
-  else if (adt <= 100){ j = 'GREAT';   add = 600;  stats.great++;   }
-  else if (adt <= 150){ j = 'GOOD';    add = 300;  stats.good++;    }
-  else                { j = 'BAD';     add = 100;  stats.bad++;     }
+  else if (adt <= 100){ j = 'GREAT';   add =  600; stats.great++;   }
+  else if (adt <= 150){ j = 'GOOD';    add =  300; stats.good++;    }
+  else                { j = 'BAD';     add =  100; stats.bad++;     }
 
   score += add;
   combo += 1;
   lastJudgementText = j;
   updateHUD();
-  try { hitSound.currentTime = 0; hitSound.play(); } catch(e) {}
-  flashKey(laneKey);
-  keySafeUntil[laneKey] = performance.now() + WRONG_COOLDOWN_MS;
+  hitSound.currentTime = 0;
+  hitSound.play();
+
   if (combo % 10 === 0) {
     comboFlash = `COMBO x${combo}!!`;
     setTimeout(() => comboFlash = '', 800);
   }
 }
-    
+
 function miss() {
   lastJudgementText = 'MISS';
   combo = 0;
   missCount++;
   stats.miss++;
   updateHUD();
-
-  const difficulty = document.getElementById('difficultySelect').value;
-  if (difficulty === 'ex' && missCount > 15) {
-    triggerFailOnce('你輸了！Miss 超過 15 次');
-  }
 }
 
-function triggerFailOnce(msg) {
-  if (gameOver) return;
-  gameOver = true;
-  running = false;
-  try { cancelAnimationFrame(loopId); } catch {}
-  try { bgm.pause(); } catch {}
-  setTimeout(() => { alert(msg); goToMenu(); }, 0);
-}
-
-/* 錯鍵處罰（不計入 MISS），加入近拍保護 */
-function checkRandomHit(t) {
-  const nowMs = performance.now();
- keys.forEach(k => {
-    if (!keyDown.has(k)) return;
-    const lane = keys.indexOf(k);
-
-    if (keySafeUntil[k]) {
-      if (nowMs < keySafeUntil[k]) return;
-      delete keySafeUntil[k];
-    }
-
-    const hasValidNote = chart.some(n =>
-      !n.hit && n.lane === lane && Math.abs((t - n.t) * 1000) <= JUDGE_WINDOW_MS
-    );
-   const hasNearNote = chart.some(n =>
-      !n.hit && n.lane === lane && Math.abs((t - n.t) * 1000) <= NEAR_WINDOW_MS
-    );
- 
-    if (!hasValidNote) {
-      if (hasNearNote) return; // 近拍保護：提早壓不扣
-      if (!lastWrongTime[k] || nowMs - lastWrongTime[k] > WRONG_COOLDOWN_MS) {
-        lastWrongTime[k] = nowMs;
-        lastJudgementText = 'WRONG';
-        score = Math.max(0, score - 100);
-        combo = 0;
-        stats.wrong++;
-        updateHUD();
-        flashKey(k);
-      }
-      keyDown.delete(k);
-    }
-  });
-}
-
-/* 主動按鍵處理（鍵盤/觸控/滑鼠統一） */
-function processPress(k) {
-  if (!running) return;
-  const nowT = (performance.now() - startTime) / 1000;
-  let nearest = null;
-  let bestAbs = Infinity;
-  for (let i = 0; i < chart.length; i++) {
-    const n = chart[i];
-    if (n.hit) continue;
-    if (keys[n.lane] !== k) continue;
-    const absDt = Math.abs((nowT - n.t) * 1000);
-    if (absDt <= TOUCH_WINDOW_MS && absDt < bestAbs) {
-      bestAbs = absDt;
-      nearest = n;
-    }
-  }
-  if (nearest) {
-    judge((nowT - nearest.t) * 1000, k);
-    nearest.hit = true;
-  } else {
-    const nowMs = performance.now();
-    if (!lastWrongTime[k] || nowMs - lastWrongTime[k] > WRONG_COOLDOWN_MS) {
-      lastWrongTime[k] = nowMs;
-      lastJudgementText = 'WRONG';
-      score = Math.max(0, score - 100);
-      combo = 0;
-      stats.wrong++;
-      updateHUD();
-      flashKey(k);
-    }
-  }
-}
-
-/* ----------------------------
-   譜面生成（保留你的版本）
------------------------------*/
-function generateChart() {
+/* ====== 產譜（非 EX/HELL：隨機；EX/HELL：節奏更密集） ====== */
+function generateChart(durationSec) {
   chart = [];
   const difficulty = document.getElementById('difficultySelect').value;
 
-  if (difficulty !== 'ex') {
-    // 原本隨機譜面（非 EX）
-    let time = 1;
-    const endTime = Math.random() * 20 + 110;
-    let doubleNoteChance = 0.35;
-    let timeGapMin = 0.2;
-    let timeGapMax = 0.45;
+  // 基礎隨機參數
+  let time = 1;
+  let doubleNoteChance = 0.35;
+  let timeGapMin = 0.20;
+  let timeGapMax = 0.45;
 
-    if (difficulty === 'beginner') {
-      doubleNoteChance = 0.2; timeGapMin = 0.3;  timeGapMax = 0.6;
-    } else if (difficulty === 'easy') {
-      doubleNoteChance = 0.2; timeGapMin = 0.25; timeGapMax = 0.5;
-    } else if (difficulty === 'normal') {
-      doubleNoteChance = 0.35; timeGapMin = 0.2; timeGapMax = 0.45;
-    } else if (difficulty === 'hard') {
-      doubleNoteChance = 0.6; timeGapMin = 0.15; timeGapMax = 0.35;
-    } else if (difficulty === 'hell') {
-      doubleNoteChance = 0.9; timeGapMin = 0.1;  timeGapMax = 0.25;
-    }
+  if (difficulty === 'beginner') {
+    doubleNoteChance = 0.15; timeGapMin = 0.30; timeGapMax = 0.60;
+  } else if (difficulty === 'easy') {
+    doubleNoteChance = 0.2;  timeGapMin = 0.25; timeGapMax = 0.50;
+  } else if (difficulty === 'normal') {
+    doubleNoteChance = 0.35; timeGapMin = 0.20; timeGapMax = 0.45;
+  } else if (difficulty === 'hard') {
+    doubleNoteChance = 0.55; timeGapMin = 0.15; timeGapMax = 0.35;
+  } else if (difficulty === 'hell') {
+    doubleNoteChance = 0.75; timeGapMin = 0.10; timeGapMax = 0.25; // 你要求「≥75%雙鍵」
+  } else if (difficulty === 'ex') {
+    doubleNoteChance = 0.60; timeGapMin = 0.12; timeGapMax = 0.30;
+  }
 
-    while (time < endTime) {
+  // 非 EX/HELL：單純隨機
+  if (!(difficulty === 'ex' || difficulty === 'hell')) {
+    while (time < durationSec) {
       const lanesUsed = new Set();
       const notesThisFrame = [];
       const count = Math.random() < doubleNoteChance ? 2 : 1;
@@ -523,112 +328,50 @@ function generateChart() {
     return;
   }
 
-  // EX：依 BPM + 分段產生
-  generateEXChartByBPM(EX_SONG_BPM, EX_OFFSET, songDuration);
-}
-
-function generateEXChartByBPM(bpm, offset, durationSec) {
-  const beat = 60 / bpm;
-  const start = Math.max(0, offset);
-  const endTime = start + durationSec;
-
-  const introEnd  = start + durationSec * 0.28;
-  const chorusEnd = start + durationSec * 0.56;
-  const dropEnd   = start + durationSec * 0.84;
-
-  let t = start;
-
-  const pushNote = (time, lane) => chart.push({ t: time, lane, type: 'tap', hit: false, y: -50 });
-  const randLane = () => Math.floor(Math.random() * 4);
-
+  // EX / HELL：以一個假定節拍（每秒 2 拍）做密集化，HELL 更密
+  const beat = 0.5; // 2 beats/sec
+  let t = 1;
   let laneCursor = 0;
   const nextLane = () => { laneCursor = (laneCursor + 1) % 4; return laneCursor; };
+  const pushNote = (tt, lane) => chart.push({ t: tt, lane, type: 'tap', hit: false, y: -50 });
+  const randLane = () => Math.floor(Math.random() * 4);
 
-  let beatsSinceJack = 0;
-
-  while (t <= endTime) {
-    let section = (t < introEnd) ? 'intro' : (t < chorusEnd) ? 'chorus' : (t < dropEnd) ? 'drop' : 'outro';
-
-    if (section === 'intro') {
+  while (t < durationSec) {
+    if (difficulty === 'ex') {
+      // 基礎雙鍵 + 半拍穿插 + 偶發三連
       pushNote(t, nextLane());
-      if (Math.random() < 0.18) pushNote(t, (laneCursor + 2) % 4);
-      t += (Math.random() < 0.35) ? beat / 2 : beat;
-      beatsSinceJack += (Math.random() < 0.35) ? 0.5 : 1;
-    }
-    else if (section === 'chorus') {
-      pushNote(t, nextLane());
-      pushNote(t, (laneCursor + 1) % 4);
-      if (Math.random() < 0.25) pushNote(t + beat / 2, (laneCursor + 2) % 4);
+      if (Math.random() < 0.6) pushNote(t, (laneCursor + 2) % 4); // 雙鍵 60%
+      if (Math.random() < 0.35) pushNote(t + beat / 2, (laneCursor + 1) % 4);
       if (Math.random() < 0.18) {
         pushNote(t + beat / 3, randLane());
         pushNote(t + 2 * beat / 3, randLane());
       }
-      t += beat / 2;
-      beatsSinceJack += 0.5;
-    }
-    else if (section === 'drop') {
-      pushNote(t, randLane());
-      pushNote(t + beat / 3, (laneCursor + 1) % 4);
-      pushNote(t + 2 * beat / 3, (laneCursor + 2) % 4);
-
-      if (Math.random() < 0.55) pushNote(t, (laneCursor + 3) % 4);
-
-      if (Math.random() < 0.5) pushNote(t + beat / 2, nextLane());
-
-      if (Math.random() < 0.35) {
-        const lanes = [0,1,2,3];
-        for (let i = 1; i <= 3; i++) {
-          pushNote(t + i * (beat / 4), lanes[(laneCursor + i) % 4]);
-        }
-      }
-
-      t += beat / 2;
-      beatsSinceJack += 0.5;
-
-      if (beatsSinceJack >= 8) {
-        beatsSinceJack = 0;
-        const jackLane = randLane();
-        for (let j = 0; j < 4; j++) {
-          const tt = t + j * (beat / 4);
-          pushNote(tt, jackLane);
-          if (Math.random() < 0.6) pushNote(tt, (jackLane + 2) % 4);
-        }
-        t += beat;
-      }
-    }
-    else { // outro
+      t += Math.random() < 0.5 ? beat / 2 : beat; // 半拍或一拍走
+    } else {
+      // HELL：雙鍵≥75%，更密，含 1/4 拍爆發
       pushNote(t, nextLane());
-      if (Math.random() < 0.12) pushNote(t, (laneCursor + 2) % 4);
-      t += (Math.random() < 0.5) ? beat : beat * 1.5;
-      beatsSinceJack += (Math.random() < 0.5) ? 1 : 1.5;
-    }
-
-    if (Math.abs(((t - start) / beat) % 4) < 0.01) {
-      pushNote(t, 0);
-      pushNote(t, 3);
+      if (Math.random() < 0.85) pushNote(t, (laneCursor + 2) % 4); // 雙鍵 85%
+      pushNote(t + beat / 2, (laneCursor + 1) % 4);
+      if (Math.random() < 0.4) {
+        pushNote(t + beat / 4, randLane());
+        pushNote(t + 3 * beat / 4, randLane());
+      }
+      t += beat / 2; // 以半拍為步進，密度高
     }
   }
-
-  chart = chart.filter(n => n.t <= endTime + 0.25);
 }
 
-/* ----------------------------
-   遊戲主迴圈 & 繪圖
------------------------------*/
+/* ====== 更新 & 繪圖 ====== */
 function update(t) {
+  // 位置
   chart.forEach(n => {
     n.y = judgeLineY - (n.t - t) * noteSpeed;
   });
 
+  // 超線 → MISS
   chart.forEach(n => {
     if (n.hit) return;
-    const laneKey = keys[n.lane];
-    const dtMs = (t - n.t) * 1000;
-    if (keyDown.has(laneKey) && Math.abs(dtMs) <= JUDGE_WINDOW_MS) {
-      judge(dtMs, laneKey);
-      keyDown.delete(laneKey);
-      n.hit = true;
-    } else if (n.y > judgeLineY + MISS_Y_OFFSET) {
+    if (n.y > judgeLineY + MISS_Y_OFFSET) {
       miss();
       n.hit = true;
     }
@@ -667,6 +410,7 @@ function render() {
     ctx.fillText(comboFlash, W / 2, H / 2 - 100);
   }
 
+  // 全部打完 → 結算
   if (!running && chart.every(n => n.hit)) {
     document.getElementById('finalScore').textContent = score;
     document.getElementById('statPerfect').textContent = stats.perfect;
@@ -685,9 +429,9 @@ function loop(ts) {
   if (paused) return;
   const t = (ts - startTime) / 1000;
   update(t);
-  checkRandomHit(t);
   render();
 
+  // 全部 hit 或 miss 完 → 停
   if (chart.every(n => n.hit)) {
     running = false;
     lastJudgementText = 'END';
@@ -709,9 +453,75 @@ function loop(ts) {
   loopId = requestAnimationFrame(loop);
 }
 
-/* ----------------------------
-   UI/流程
------------------------------*/
+/* ====== 輸入（鍵盤 + 手機觸控）====== */
+// 鍵盤
+window.addEventListener('keydown', e => {
+  const k = e.key.toLowerCase();
+  const idx = keys.indexOf(k);
+  if (idx !== -1) {
+    pressLane(idx);
+  }
+  if (e.key === 'Escape') {
+    if (paused) resumeGame(); else pauseGame();
+  }
+});
+
+// 點 hit 圓鍵（手機 + 桌面）
+['d','f','j','k'].forEach((k, idx) => {
+  const el = document.getElementById('key-' + k);
+  // pointerdown 兼容 mouse/touch
+  el.addEventListener('pointerdown', (e) => {
+    e.preventDefault();
+    pressLane(idx);
+  }, { passive: false });
+});
+
+// 直接點 canvas 對應軌道（手機玩家好點）
+canvas.addEventListener('pointerdown', (e) => {
+  e.preventDefault();
+  const rect = canvas.getBoundingClientRect();
+  const x = e.clientX - rect.left;
+  const lane = Math.min(3, Math.max(0, Math.floor(x / laneWidth)));
+  pressLane(lane);
+}, { passive: false });
+
+function pressLane(lane) {
+  if (!running) return;
+
+  // 找最近可判定音符（該 lane、時間靠近）
+  const tNow = (performance.now() - startTime) / 1000;
+  let targetIndex = -1;
+  let bestAbs = Infinity;
+
+  for (let i = 0; i < chart.length; i++) {
+    const n = chart[i];
+    if (n.hit) continue;
+    if (n.lane !== lane) continue;
+    const dtMs = (tNow - n.t) * 1000;
+    const adt = Math.abs(dtMs);
+    if (adt <= TOUCH_WINDOW_MS && adt < bestAbs) {
+      bestAbs = adt;
+      targetIndex = i;
+    }
+  }
+
+  if (targetIndex >= 0) {
+    const n = chart[targetIndex];
+    judge((tNow - n.t) * 1000);
+    n.hit = true;
+    flashKeyByLane(lane);
+  } else {
+    // 不在窗口內的誤觸 → WRONG，只在「沒有靠近音符」時才記
+    lastJudgementText = 'WRONG';
+    score = Math.max(0, score - 100);
+    combo = 0;
+    stats.wrong++;
+    updateHUD();
+    flashKeyByLane(lane);
+  }
+}
+
+/* ====== UI / 流程 ====== */
 function showCountdown(callback) {
   const countdownText = document.getElementById('countdownText');
   const steps = ['Ready', '3', '2', '1', 'Go!'];
@@ -731,13 +541,10 @@ function showCountdown(callback) {
     i++;
     setTimeout(nextStep, 700);
   }
-
   nextStep();
 }
 
 function startGame() {
-  pickRandomSong(); // 🎶 每局開場隨機歌曲
-
   const difficulty = document.getElementById('difficultySelect').value;
   const speedMultiplierSelect = document.getElementById('speedMultiplier');
   let multiplier = parseFloat(speedMultiplierSelect.value);
@@ -748,42 +555,50 @@ function startGame() {
 
   document.body.classList.toggle('ex-mode', difficulty === 'ex');
 
+  // 重置
   try { bgm.pause(); } catch {}
-  bgm.currentTime = 0;
   cancelAnimationFrame(loopId);
-
-  score = 0;
-  combo = 0;
-  lastJudgementText = '-';
-  comboFlash = '';
-  chart = [];
-  keyDown.clear();
-  keySafeUntil = {};
-  paused = false;
-  running = true;
-  lastWrongTime = {};
-  missCount = 0;
-  gameOver = false;
+  score = 0; combo = 0; lastJudgementText = '-'; comboFlash = '';
+  chart = []; paused = false; running = true; missCount = 0; gameOver = false;
   stats = { perfect:0, great:0, good:0, bad:0, wrong:0, miss:0 };
   elapsedTimeBeforePause = 0;
-
   updateHUD();
-  generateChart();
 
-  document.getElementById('menuScreen').style.display = 'none';
-  document.getElementById('optionsScreen').style.display = 'none';
-  document.getElementById('endScreen').style.display = 'none';
-  document.getElementById('pauseScreen').style.display = 'none';
-  document.getElementById('gameScreen').style.display = 'block';
-  document.getElementById('gameScreen').classList.remove('blur');
+  // 隨機選歌
+  const pick = SONGS[Math.floor(Math.random() * SONGS.length)];
+  const url = 'music/' + encodeURIComponent(pick);
+  bgm.src = url;
+  bgm.load();
 
-  showCountdown(() => {
-    startTime = performance.now();
-    // ✅ 所有難度都播放音樂
-    bgm.currentTime = 0;
-    bgm.play().catch(e => console.log('play 失敗：', e));
-    loopId = requestAnimationFrame(loop);
-  });
+  // 等 metadata 拿長度後 → 以 2/3 長度產譜並開打
+  bgm.onloadedmetadata = () => {
+    const full = (!isNaN(bgm.duration) && bgm.duration > 0) ? bgm.duration : 180;
+    const durationSec = Math.max(30, full * (2/3)); // 至少 30 秒防太短
+    generateChart(durationSec);
+
+    // 顯示畫面
+    document.getElementById('menuScreen').style.display = 'none';
+    document.getElementById('optionsScreen').style.display = 'none';
+    document.getElementById('endScreen').style.display = 'none';
+    document.getElementById('pauseScreen').style.display = 'none';
+    document.getElementById('gameScreen').style.display = 'block';
+    document.getElementById('gameScreen').classList.remove('blur');
+
+    // 倒數 -> 同步開始
+    showCountdown(() => {
+      startTime = performance.now();
+      bgm.currentTime = 0;
+      bgm.play().catch(()=>{}); // 行動裝置可能需使用者互動，按開始已符合
+      loopId = requestAnimationFrame(loop);
+
+      // 在 2/3 時間點後把剩餘音符清掉避免「空白期」
+      setTimeout(() => {
+        // 若還在跑且圖上還有未命中的，將後面時間太遠的音符標記 hit
+        const stopT = (performance.now() - startTime) / 1000;
+        chart.forEach(n => { if (!n.hit && n.t > stopT + 0.2) n.hit = true; });
+      }, durationSec * 1000);
+    });
+  };
 }
 
 function pauseGame() {
@@ -806,7 +621,7 @@ function resumeGame() {
 
   showCountdown(() => {
     startTime = performance.now() - (elapsedTimeBeforePause * 1000);
-    bgm.play().catch(e => console.log('resume play 失敗：', e));
+    bgm.play().catch(()=>{});
     loopId = requestAnimationFrame(loop);
   });
 }
@@ -827,12 +642,13 @@ function showOptions() {
   document.getElementById('optionsScreen').style.display = 'block';
 }
 
-/* 停用長按選單與雙指縮放等干擾 */
-document.addEventListener("contextmenu", e => e.preventDefault());
-document.addEventListener("gesturestart", e => e.preventDefault());
+// 禁右鍵
+document.addEventListener("contextmenu", function(e) { e.preventDefault(); });
   </script>
 </body>
 </html>
+
+
 
 
 
