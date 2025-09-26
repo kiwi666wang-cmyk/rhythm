@@ -674,7 +674,7 @@ function startGame() {
   }
 
   try { bgm.pause(); } catch {}
-  bgm.currentTime = 0;  // 與譜面同時起跑
+  bgm.currentTime = 0;  
   cancelAnimationFrame(loopId);
 
   score = 0;
@@ -703,7 +703,13 @@ function startGame() {
 
   showCountdown(() => {
     startTime = performance.now();
-    bgm.play();
+    
+    // ✅ 只有 EX 難度才播 bgm
+    if (difficulty === 'ex') {
+      bgm.currentTime = 0;
+      bgm.play();
+    }
+
     loopId = requestAnimationFrame(loop);
   });
 }
@@ -755,6 +761,7 @@ document.addEventListener("contextmenu", function(e) {
   </script>
 </body>
 </html>
+
 
 
 
