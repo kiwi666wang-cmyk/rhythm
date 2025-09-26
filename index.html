@@ -17,9 +17,24 @@
       display: block; margin: 20px auto; background: #1f2340; border: 2px solid #fff;
       width: 95%; max-width: 420px; height: auto; touch-action: manipulation;
     }
-    .hitbar {
-      display: flex; justify-content: space-between; align-items: flex-end;
-      width: 95%; max-width: 420px; margin: -90px auto 40px; height: 90px; position: relative; z-index: 2;
+   .hitbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  width: 95%;
+  max-width: 420px;
+  height: 90px;
+  position: absolute;  /* 改成絕對定位 */
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: 0; /* 預設在底部 */
+  z-index: 2;
+}
+
+.hitbar.up { 
+  top: 0;     /* 上升打擊時在頂部 */
+  bottom: auto;
+}
     }
     .hitkey {
       flex: 1; margin: 0 5px; height: 90px; border: 3px solid transparent; border-radius: 50%;
@@ -675,6 +690,7 @@
   </script>
 </body>
 </html>
+
 
 
 
