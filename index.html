@@ -2,17 +2,19 @@
 <html lang="zh-Hant">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+ <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>DFJK 節奏遊戲</title>
   <link href="https://fonts.googleapis.com/css2?family=Fredoka+One&display=swap" rel="stylesheet">
-  <style>
+   <style>
+    html, body {
+      touch-action: manipulation;
+    }
     body {
       margin: 0;
       background: #0f1220;
       color: #fff;
       font-family: sans-serif;
       text-align: center;
-      touch-action: manipulation;
       transition: background 0.5s ease;
     }
     body.ex-mode {
@@ -682,9 +684,17 @@ function showOptions() {
 
 // 禁右鍵
 document.addEventListener("contextmenu", function(e) { e.preventDefault(); });
+// 防止 iOS / Android 縮放
+document.addEventListener('gesturestart', function (e) {
+  e.preventDefault();
+});
+document.addEventListener('dblclick', function (e) {
+  e.preventDefault();
+});
   </script>
 </body>
 </html>
+
 
 
 
