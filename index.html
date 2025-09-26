@@ -191,6 +191,9 @@
 
     let baseNoteSpeed = 550;
     let noteSpeed = baseNoteSpeed;
+    let noteDirection = "down"; // 預設為下落
+    let judgeLineY = H - hitkeyHeight / 2; // 判定線位置，會依方向變動
+
 
     const JUDGE_WINDOW_MS = 200;
     const MISS_Y_OFFSET = 40;
@@ -398,16 +401,31 @@
 
     /* ====== 更新 & 繪圖 ====== */
     function update(t) {
-      chart.forEach(n => { n.y = noteYAtTime(n, t); });
-
-      chart.forEach(n => {
-        if (n.hit) return;
-        if (isMiss(n)) {
-          n.hit = true;
-          miss();
-        }
-      });
+  // 位置：依照上升/下落方向計算
+  chart.forEach(n => {
+    if (noteDirection === "down") {
+      n.y = judgeLineY - (n.t - t) * noteSpeed;
+    } else {
+      n.y = judgeLineY + (n.t - t) * noteSpeed;
     }
+  });
+
+  // 超線 → MISS
+  chart.forEach(n => {
+    if (n.hit) return;
+    if (noteDirection === "down") {
+      if (n.y > judgeLineY + MISS_Y_OFFSET) {
+        n.hit = true;
+        miss();
+      }
+    } else {
+      if (n.y < judgeLineY - MISS_Y_OFFSET) {
+        n.hit = true;
+        miss();
+      }
+    }
+  });
+}
 
     function render() {
       const judgeLineY = getJudgeLineY();
@@ -579,6 +597,18 @@
       else if (difficulty === 'easy')     multiplier = 0.9;
       else if (difficulty === 'ex')       multiplier = 1.8;
       noteSpeed = baseNoteSpeed * multiplier;
+      // 讀取方向設定
+noteDirection = document.getElementById('noteDirection').value;
+if (noteDirection === "down") {
+  judgeLineY = H - hitkeyHeight / 2;
+  document.querySelector(".hitbar").style.top = "";
+  document.querySelector(".hitbar").style.bottom = "40px";
+} else {
+  judgeLineY = hitkeyHeight / 2;
+  document.querySelector(".hitbar").style.bottom = "";
+  document.querySelector(".hitbar").style.top = "40px";
+}
+
 
       document.body.classList.toggle('ex-mode', difficulty === 'ex');
 
@@ -675,6 +705,7 @@
   </script>
 </body>
 </html>
+
 
 
 
