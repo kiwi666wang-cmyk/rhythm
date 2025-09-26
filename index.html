@@ -609,11 +609,10 @@ function startGame() {
   bgm.src = url;
   bgm.load();
 
-  // 等 metadata 拿長度後 → 以 2/3 長度產譜並開打
-  bgm.onloadedmetadata = () => {
-    const full = (!isNaN(bgm.duration) && bgm.duration > 0) ? bgm.duration : 180;
-    const durationSec = Math.max(30, full * (2/3)); // 至少 30 秒
-    generateChart(durationSec);
+  // 等 metadata 拿長度後 → 用歌曲完整時長產譜
+bgm.onloadedmetadata = () => {
+  const durationSec = (!isNaN(bgm.duration) && bgm.duration > 0) ? bgm.duration : 180;
+  generateChart(durationSec);
     updateHUD(); // 顯示曲名/難度
 
     // 顯示畫面
@@ -686,6 +685,7 @@ document.addEventListener("contextmenu", function(e) { e.preventDefault(); });
   </script>
 </body>
 </html>
+
 
 
 
