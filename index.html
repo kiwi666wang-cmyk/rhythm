@@ -2,83 +2,71 @@
 <html lang="zh-Hant">
 <head>
   <meta charset="UTF-8" />
-  <!-- 防縮放，行動裝置更穩 -->
+  <!-- 行動裝置：關閉縮放、雙擊放大、pinch -->
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>DFJK 節奏遊戲</title>
   <link href="https://fonts.googleapis.com/css2?family=Fredoka+One&display=swap" rel="stylesheet">
   <style>
     html, body { touch-action: manipulation; }
     body {
-      margin: 0;
-      background: #0f1220;
-      color: #fff;
-      font-family: sans-serif;
-      text-align: center;
-      transition: background 0.5s ease;
+      margin: 0; background: #0f1220; color: #fff; font-family: sans-serif;
+      text-align: center; transition: background 0.5s ease;
     }
     body.ex-mode { background: linear-gradient(to bottom, #ff3300, #990000, #000000); }
     canvas {
-      display: block;
-      margin: 20px auto;
-      background: #1f2340;
-      border: 2px solid #fff;
-      width: 95%;
-      max-width: 420px;
-      height: auto;
-      touch-action: manipulation;
+      display: block; margin: 20px auto; background: #1f2340; border: 2px solid #fff;
+      width: 95%; max-width: 420px; height: auto; touch-action: manipulation;
     }
     .hitbar {
       display: flex; justify-content: space-between; align-items: flex-end;
-      width: 95%; max-width: 420px; margin: -90px auto 40px; height: 90px;
-      position: relative; z-index: 2;
+      width: 95%; max-width: 420px; margin: -90px auto 40px; height: 90px; position: relative; z-index: 2;
     }
     .hitkey {
       flex: 1; margin: 0 5px; height: 90px; border: 3px solid transparent; border-radius: 50%;
-      background: rgba(255,255,255,0.05); font-size: 36px; font-weight: bold;
+      background: rgba(255,255,255,.05); font-size: 36px; font-weight: bold;
       display: flex; align-items: center; justify-content: center;
-      transition: transform .2s, box-shadow .2s;
-      user-select: none; -webkit-user-select: none; touch-action: manipulation;
+      transition: transform .2s, box-shadow .2s; user-select: none; -webkit-user-select: none; touch-action: manipulation;
     }
-    #key-d { color: #b266ff; border-color: #b266ff; }
-    #key-f { color: #66ccff; border-color: #66ccff; }
-    #key-j { color: #66ff66; border-color: #66ff66; }
-    #key-k { color: #ff6666; border-color: #ff6666; }
+    #key-d { color:#b266ff; border-color:#b266ff; }  #key-f { color:#66ccff; border-color:#66ccff; }
+    #key-j { color:#66ff66; border-color:#66ff66; }  #key-k { color:#ff6666; border-color:#ff6666; }
     .hitkey.flash { transform: scale(1.4); box-shadow: 0 0 20px currentColor; background: rgba(255,255,255,.2); }
+
     .hud { font-size: 18px; margin-top: 10px; line-height: 1.6; }
     .songline { font-size: 14px; opacity: .9; }
     button {
-      margin: 10px; padding: 10px 20px; font-size: 18px; background: #78d5ff;
-      border: none; border-radius: 8px; cursor: pointer;
+      margin:10px; padding:10px 20px; font-size:18px; background:#78d5ff; border:none; border-radius:8px; cursor:pointer;
     }
-    #menuScreen, #endScreen, #optionsScreen, #pauseScreen { padding-top: 150px; }
+    #menuScreen, #endScreen, #optionsScreen, #pauseScreen { padding-top: 120px; }
     .blur { filter: blur(6px); pointer-events: none; user-select: none; }
     #pauseButton { position: absolute; top: 10px; right: 10px; z-index: 3; }
     .countdown {
-      position: absolute; top: 40%; left: 50%; transform: translate(-50%, -50%);
-      font-family: 'Fredoka One', sans-serif; font-size: 72px; color: #fff;
-      text-shadow: 2px 2px 8px #000; z-index: 5; animation: pop .6s ease-out; pointer-events: none;
+      position: absolute; top: 40%; left: 50%; transform: translate(-50%,-50%);
+      font-family: 'Fredoka One', sans-serif; font-size: 72px; color: #fff; text-shadow: 2px 2px 8px #000; z-index: 5;
+      animation: pop .6s ease-out; pointer-events: none;
     }
     @keyframes pop {
-      0% { transform: scale(.5) translate(-50%, -50%); opacity: 0; }
-      50% { transform: scale(1.2) translate(-50%, -50%); opacity: 1; }
-      100% { transform: scale(1) translate(-50%, -50%); opacity: 0; }
+      0% { transform: scale(.5) translate(-50%,-50%); opacity:0; }
+      50% { transform: scale(1.2) translate(-50%,-50%); opacity:1; }
+      100% { transform: scale(1) translate(-50%,-50%); opacity:0; }
     }
-    .opt-row { margin: 10px 0; }
-    .opt-row label { margin-right: 6px; }
-    select { padding: 6px 8px; border-radius: 6px; border: 1px solid #444; background: #0f1220; color: #fff; }
+    .row { margin: 10px 0; }
+    label { margin-right: 6px; }
+    select { padding: 6px 10px; border-radius: 6px; border: 1px solid #445; background:#12152a; color:#fff; }
   </style>
 </head>
 <body>
+  <!-- 主選單 -->
   <div id="menuScreen">
     <h1>🎵 DFJK 節奏遊戲</h1>
     <button onclick="startGame()">開始遊戲</button>
     <button onclick="showOptions()">選項</button>
   </div>
 
+  <!-- 選項 -->
   <div id="optionsScreen" style="display:none;">
     <h2>⚙️ 遊戲選項</h2>
 
-    <div class="opt-row">
+    <div class="row">
       <label for="difficultySelect">難度：</label>
       <select id="difficultySelect">
         <option value="ex">EX（極限）</option>
@@ -90,7 +78,7 @@
       </select>
     </div>
 
-    <div class="opt-row">
+    <div class="row">
       <label for="speedMultiplier">速度倍率：</label>
       <select id="speedMultiplier">
         <option value="1">1.0x（標準）</option>
@@ -102,55 +90,64 @@
       </select>
     </div>
 
-    <div class="opt-row">
+    <div class="row">
       <label for="noteDirection">音符方向：</label>
       <select id="noteDirection">
-        <option value="down" selected>下落打擊</option>
-        <option value="up">上升打擊</option>
+        <option value="down" selected>下落打擊（打擊線在底）</option>
+        <option value="up">上升打擊（打擊線在頂）</option>
       </select>
     </div>
 
-    <div class="opt-row">
-      <label for="inputMode">判定模式：</label>
-      <select id="inputMode">
-        <option value="new" selected>New input（不計 WRONG）</option>
-        <option value="old">Old input（有 WRONG 判定）</option>
+    <div class="row">
+      <label for="judgeMode">判定模式：</label>
+      <select id="judgeMode">
+        <option value="old" selected>Old Input（含 WRONG）</option>
+        <option value="new">New Input（移除 WRONG）</option>
       </select>
     </div>
 
-    <button onclick="goToMenu()">回主選單</button>
+    <div class="row">
+      <button onclick="goToMenu()">回主選單</button>
+    </div>
   </div>
 
-  <div id="gameScreen" style="display:none;">
+  <!-- 遊戲畫面 -->
+  <div id="gameScreen" style="display:none; position:relative;">
     <button id="pauseButton" onclick="pauseGame()">⏸️</button>
     <canvas id="gameCanvas" width="420" height="640"></canvas>
+
     <div class="hitbar">
       <div class="hitkey" id="key-d">←</div>
       <div class="hitkey" id="key-f">↓</div>
       <div class="hitkey" id="key-j">↑</div>
       <div class="hitkey" id="key-k">→</div>
     </div>
+
     <div class="hud">
       分數：<span id="score">0</span>　
       連擊：<span id="combo">0</span>　
       判定：<span id="judgement">-</span>　
       MISS：<span id="missCount">0</span>
       <div class="songline">
-        曲目：<span id="songTitle">-</span>　｜　難度：<span id="diffLabel">-</span>
+        曲目：<span id="songTitle">-</span>　｜　難度：<span id="diffLabel">-</span>　｜　方向：<span id="dirLabel">-</span>　｜　判定：<span id="judgeLabel">-</span>
       </div>
     </div>
   </div>
 
+  <!-- 暫停 -->
   <div id="pauseScreen" style="display:none;">
     <h2>⏸️ 遊戲暫停</h2>
     <button onclick="resumeGame()">▶️ 繼續</button>
     <button onclick="goToMenu()">回主選單</button>
   </div>
 
-  <div id="endScreen" style="display: none;">
+  <!-- 結算 -->
+  <div id="endScreen" style="display:none;">
     <h2>🎮 遊戲結束！</h2>
     <p>曲目：<span id="finalSong">-</span></p>
     <p>難度：<span id="finalDiff">-</span></p>
+    <p>方向：<span id="finalDir">-</span></p>
+    <p>判定：<span id="finalJudge">-</span></p>
     <p>分數：<span id="finalScore">0</span></p>
     <p>PERFECT：<span id="statPerfect">0</span></p>
     <p>GREAT：<span id="statGreat">0</span></p>
@@ -162,514 +159,523 @@
     <button onclick="goToMenu()">回主選單</button>
   </div>
 
+  <!-- 倒數文字 -->
   <div id="countdownText" class="countdown" style="display:none;"></div>
 
   <audio id="hitSound" src="https://cdn.pixabay.com/download/audio/2022/03/15/audio_6e3e3b6f3f.mp3?filename=click-124467.mp3"></audio>
   <audio id="bgm"></audio>
 
   <script>
-/* ========= 基本參數 ========= */
-const canvas = document.getElementById('gameCanvas');
-const ctx = canvas.getContext('2d');
-const W = canvas.width, H = canvas.height;
-const laneWidth = W / 4;
-const hitkeyHeight = 90;
-const judgeLineY = H - hitkeyHeight / 2;
+    /* ========= 參數 ========= */
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    const W = canvas.width, H = canvas.height;
+    const laneWidth = W / 4;
+    const hitkeyHeight = 90;
 
-const keys = ['d','f','j','k'];
+    // 打擊線位置依方向切換
+    const getJudgeLineY = () => {
+      const dir = document.getElementById('noteDirection').value;
+      return (dir === 'up') ? (hitkeyHeight / 2) : (H - hitkeyHeight / 2);
+    };
 
-let score = 0, combo = 0, lastJudgementText = '-';
-let startTime = 0, running = false;
-let chart = [];
-let comboFlash = '';
-let loopId = null;
-let paused = false;
-let elapsedTimeBeforePause = 0;
+    const keys = ['d','f','j','k'];
 
-const hitSound = document.getElementById('hitSound');
-const bgm = document.getElementById('bgm');
+    let score = 0, combo = 0, lastJudgementText = '-';
+    let startTime = 0, running = false, paused = false, loopId = null;
+    let chart = [], comboFlash = '';
+    let elapsedTimeBeforePause = 0;
 
-let baseNoteSpeed = 550;
-let noteSpeed = baseNoteSpeed;
+    const hitSound = document.getElementById('hitSound');
+    const bgm = document.getElementById('bgm');
 
-/* 判定窗口 & 參數 */
-const JUDGE_WINDOW_MS = 200;
-const MISS_Y_OFFSET = 40;
-const TOUCH_WINDOW_MS = 200;
+    let baseNoteSpeed = 550;
+    let noteSpeed = baseNoteSpeed;
 
-/* 統計 */
-let missCount = 0;
-let gameOver = false;
-let stats = { perfect:0, great:0, good:0, bad:0, wrong:0, miss:0 };
+    const JUDGE_WINDOW_MS = 200;
+    const MISS_Y_OFFSET = 40;
+    const TOUCH_WINDOW_MS = 200;
 
-/* 當前歌曲/難度顯示 */
-let currentSongTitle = '-';
-let currentDifficulty = '-';
+    // 統計
+    let missCount = 0;
+    let gameOver = false;
+    let stats = { perfect:0, great:0, good:0, bad:0, wrong:0, miss:0 };
 
-/* 選項（方向/輸入模式） */
-function getNoteDirection() {
-  const el = document.getElementById('noteDirection');
-  return el ? el.value : 'down';
-}
-function getInputMode() {
-  const el = document.getElementById('inputMode');
-  return el ? el.value : 'new';
-}
+    // 當前資訊
+    let currentSongTitle = '-';
+    let currentDifficulty = '-';
+    let currentDirection = 'down';
+    let currentJudgeMode = 'old';
 
-/* 隨機歌曲清單（請確保 /music 下檔名一致） */
-const SONGS = [
-  "Charlie Puth - Light Switch [Official Music Video] - Charlie Puth.mp3",
-  "Creepy Nuts - オトノケ(Otonoke) 【Official MV】 [Dandadan OP] - Creepy Nuts.mp3",
-  "Creepy Nuts ”Mirage” × Anime ”Call of the Night” Collaboration Music Video Opening Theme Song - Creepy Nuts.mp3",
-  "Creepy Nuts ”Nemure” × Anime ”Call of the Night” Collaboration Music Video Ending Theme Song - Creepy Nuts (1).mp3",
-  "Creepy Nuts｢Bling-Bang-Bang-Born｣ × TV Anime｢マッシュル-MASHLE-｣ Collaboration Music Video #BBBBダンス - Creepy Nuts.mp3",
-  "KANA-BOON - Silhouette - KANABOONVEVO.mp3",
-  "Lost Sky - Fearless pt.II (feat. Chris Linton) Trap NCS - Copyright Free Music - NoCopyrightSounds.mp3",
-  "Lost Sky - Vision pt. II (feat. She Is Jules) Future Trap NCS - Copyright Free Music - NoCopyrightSounds.mp3",
-  "Lost Sky - Where We Started (feat. Jex) Melodic Dubstep NCS - Copyright Free Music - NoCopyrightSounds.mp3",
-  "Lost Sky, Sara Skinner - Dreams pt. II (feat. Sara Skinner) [NCS Release].mp3",
-  "OneRepublic - Nobody (from Kaiju No. 8) [Official Music Video] - OneRepublicVEVO.mp3",
-  "YOASOBI「Watch me!」Official Music Video - Ayase _ YOASOBI.mp3",
-  "yung kai - blue (official music video) - yung kai.mp3",
-  "【AKASAKI】Bunny Girl _ バニーガール（Lyric Video） - AKASAKI (19).mp3",
-  "【MV】隙_ゆーり【オリジナル】 - ゆーり🍎🐥〔24〕・yuri (1).mp3",
-  "【imase】NIGHT DANCER（MV） - imase.mp3",
-  "【オリジナル楽曲】粛聖!! ロリ神レクイエム☆ _ しぐれうい（9さい）【IOSYS（まろん&D.watt）】 - しぐれうい.mp3",
-  "なとり - Overdose - なとり _ natori.mp3",
-  "ロクデナシ「ただ声一つ」_ Rokudenashi - One Voice【Official Music Video】 - ロクデナシ _ Rokudenashi.mp3",
-  "好きだから。_ 『ユイカ』【MV】 - 『ユイカ』.mp3",
-  "廻廻奇譚 - Eve MV - Eve.mp3",
-  "青のすみか _ キタニタツヤ - Where Our Blue Is _ Tatsuya Kitani - キタニタツヤ _ Tatsuya Kitani.mp3"
-];
+    // 曲庫（請確保 /music 內檔名一致）
+    const SONGS = [
+      "Charlie Puth - Light Switch [Official Music Video] - Charlie Puth.mp3",
+      "Creepy Nuts - オトノケ(Otonoke) 【Official MV】 [Dandadan OP] - Creepy Nuts.mp3",
+      "Creepy Nuts ”Mirage” × Anime ”Call of the Night” Collaboration Music Video Opening Theme Song - Creepy Nuts.mp3",
+      "Creepy Nuts ”Nemure” × Anime ”Call of the Night” Collaboration Music Video Ending Theme Song - Creepy Nuts (1).mp3",
+      "Creepy Nuts｢Bling-Bang-Bang-Born｣ × TV Anime｢マッシュル-MASHLE-｣ Collaboration Music Video #BBBBダンス - Creepy Nuts.mp3",
+      "KANA-BOON - Silhouette - KANABOONVEVO.mp3",
+      "Lost Sky - Fearless pt.II (feat. Chris Linton) Trap NCS - Copyright Free Music - NoCopyrightSounds.mp3",
+      "Lost Sky - Vision pt. II (feat. She Is Jules) Future Trap NCS - Copyright Free Music - NoCopyrightSounds.mp3",
+      "Lost Sky - Where We Started (feat. Jex) Melodic Dubstep NCS - Copyright Free Music - NoCopyrightSounds.mp3",
+      "Lost Sky, Sara Skinner - Dreams pt. II (feat. Sara Skinner) [NCS Release].mp3",
+      "OneRepublic - Nobody (from Kaiju No. 8) [Official Music Video] - OneRepublicVEVO.mp3",
+      "YOASOBI「Watch me!」Official Music Video - Ayase _ YOASOBI.mp3",
+      "yung kai - blue (official music video) - yung kai.mp3",
+      "【AKASAKI】Bunny Girl _ バニーガール（Lyric Video） - AKASAKI (19).mp3",
+      "【MV】隙_ゆーり【オリジナル】 - ゆーり🍎🐥〔24〕・yuri (1).mp3",
+      "【imase】NIGHT DANCER（MV） - imase.mp3",
+      "【オリジナル楽曲】粛聖!! ロリ神レクイエム☆ _ しぐれうい（9さい）【IOSYS（まろん&D.watt）】 - しぐれうい.mp3",
+      "なとり - Overdose - なとり _ natori.mp3",
+      "ロクデナシ「ただ声一つ」_ Rokudenashi - One Voice【Official Music Video】 - ロクデナシ _ Rokudenashi.mp3",
+      "好きだから。_ 『ユイカ』【MV】 - 『ユイカ』.mp3",
+      "廻廻奇譚 - Eve MV - Eve.mp3",
+      "青のすみか _ キタニタツヤ - Where Our Blue Is _ Tatsuya Kitani - キタニタツヤ _ Tatsuya Kitani.mp3"
+    ];
 
-/* ====== 輔助：更新 HUD ====== */
-function updateHUD() {
-  document.getElementById('score').textContent = score;
-  document.getElementById('combo').textContent = combo;
-  document.getElementById('judgement').textContent = lastJudgementText;
-  document.getElementById('missCount').textContent = missCount;
-  document.getElementById('songTitle').textContent = currentSongTitle;
-  document.getElementById('diffLabel').textContent = currentDifficulty.toUpperCase();
-}
+    /* ====== HUD ====== */
+    function updateHUD() {
+      document.getElementById('score').textContent = score;
+      document.getElementById('combo').textContent = combo;
+      document.getElementById('judgement').textContent = lastJudgementText;
+      document.getElementById('missCount').textContent = missCount;
+      document.getElementById('songTitle').textContent = currentSongTitle;
+      document.getElementById('diffLabel').textContent = currentDifficulty.toUpperCase();
+      document.getElementById('dirLabel').textContent = (currentDirection === 'up' ? '上升' : '下落');
+      document.getElementById('judgeLabel').textContent = (currentJudgeMode === 'old' ? 'Old' : 'New');
+    }
 
-/* ====== 視覺：按鍵亮起 ====== */
-function flashKeyByLane(laneIdx) {
-  const id = ['d','f','j','k'][laneIdx];
-  const el = document.getElementById('key-' + id);
-  if (!el) return;
-  el.classList.add('flash');
-  setTimeout(() => el.classList.remove('flash'), 120);
-}
+    /* ====== 視覺：按鍵亮起 ====== */
+    function flashKeyByLane(laneIdx) {
+      const id = ['d','f','j','k'][laneIdx];
+      const el = document.getElementById('key-' + id);
+      if (!el) return;
+      el.classList.add('flash');
+      setTimeout(() => el.classList.remove('flash'), 120);
+    }
 
-/* ====== 判定 ====== */
-function judge(dtMs) {
-  const adt = Math.abs(dtMs);
-  let j = 'GOOD', add = 300;
+    /* ====== 判定 ====== */
+    function judge(dtMs) {
+      const adt = Math.abs(dtMs);
+      let j = 'GOOD', add = 300;
 
-  if (adt <= 50)      { j = 'PERFECT'; add = 1000; stats.perfect++; }
-  else if (adt <= 100){ j = 'GREAT';   add =  600; stats.great++;   }
-  else if (adt <= 150){ j = 'GOOD';    add =  300; stats.good++;    }
-  else                { j = 'BAD';     add =  100; stats.bad++;     }
+      if (adt <= 50)      { j = 'PERFECT'; add = 1000; stats.perfect++; }
+      else if (adt <= 100){ j = 'GREAT';   add =  600; stats.great++;   }
+      else if (adt <= 150){ j = 'GOOD';    add =  300; stats.good++;    }
+      else                { j = 'BAD';     add =  100; stats.bad++;     }
 
-  score += add;
-  combo += 1;
-  lastJudgementText = j;
-  updateHUD();
-  hitSound.currentTime = 0;
-  hitSound.play();
+      score += add;
+      combo += 1;
+      lastJudgementText = j;
+      updateHUD();
+      hitSound.currentTime = 0;
+      hitSound.play();
 
-  if (combo % 10 === 0) {
-    comboFlash = `COMBO x${combo}!!`;
-    setTimeout(() => comboFlash = '', 800);
-  }
-}
+      if (combo % 10 === 0) {
+        comboFlash = `COMBO x${combo}!!`;
+        setTimeout(() => comboFlash = '', 800);
+      }
+    }
 
-function miss() {
-  lastJudgementText = 'MISS';
-  combo = 0;
-  missCount++;
-  stats.miss++;
-  updateHUD();
+    function miss() {
+      lastJudgementText = 'MISS';
+      combo = 0;
+      missCount++;
+      stats.miss++;
+      updateHUD();
 
-  // EX：15 次 MISS 直接失敗
-  const difficulty = document.getElementById('difficultySelect').value;
-  if (difficulty === 'ex' && missCount > 15) {
-    triggerFailOnce('你輸了！EX 模式 MISS 超過 15 次');
-  }
-}
+      // EX：15 次 MISS 直接失敗
+      if (currentDifficulty === 'ex' && missCount > 15) {
+        triggerFailOnce('你輸了！EX 模式 MISS 超過 15 次');
+      }
+    }
 
-function triggerFailOnce(msg) {
-  if (gameOver) return;
-  gameOver = true;
-  running = false;
-  try { cancelAnimationFrame(loopId); } catch {}
-  try { bgm.pause(); } catch {}
-  setTimeout(() => {
-    alert(msg);
-    goToMenu();
-  }, 0);
-}
+    function triggerFailOnce(msg) {
+      if (gameOver) return;
+      gameOver = true;
+      running = false;
+      try { cancelAnimationFrame(loopId); } catch {}
+      try { bgm.pause(); } catch {}
+      setTimeout(() => { alert(msg); goToMenu(); }, 0);
+    }
 
-/* ====== 產譜（非 EX/HELL：隨機；EX/HELL：更密） ====== */
-function generateChart(durationSec) {
-  chart = [];
-  const difficulty = document.getElementById('difficultySelect').value;
+    /* ====== 產譜 ====== */
+    function generateChart(durationSec) {
+      chart = [];
+      const difficulty = currentDifficulty;
 
-  let time = 1;
-  let doubleNoteChance = 0.35;
-  let timeGapMin = 0.20;
-  let timeGapMax = 0.45;
+      // 隨機參數
+      let time = 1;
+      let doubleNoteChance = 0.35;
+      let timeGapMin = 0.20;
+      let timeGapMax = 0.45;
 
-  if (difficulty === 'beginner') {
-    doubleNoteChance = 0.15; timeGapMin = 0.30; timeGapMax = 0.60;
-  } else if (difficulty === 'easy') {
-    doubleNoteChance = 0.2;  timeGapMin = 0.25; timeGapMax = 0.50;
-  } else if (difficulty === 'normal') {
-    doubleNoteChance = 0.35; timeGapMin = 0.20; timeGapMax = 0.45;
-  } else if (difficulty === 'hard') {
-    doubleNoteChance = 0.55; timeGapMin = 0.15; timeGapMax = 0.35;
-  } else if (difficulty === 'hell') {
-    doubleNoteChance = 0.75; timeGapMin = 0.10; timeGapMax = 0.25; // ≥75%雙鍵
-  } else if (difficulty === 'ex') {
-    doubleNoteChance = 0.60; timeGapMin = 0.12; timeGapMax = 0.30;
-  }
+      if (difficulty === 'beginner') {
+        doubleNoteChance = 0.15; timeGapMin = 0.30; timeGapMax = 0.60;
+      } else if (difficulty === 'easy') {
+        doubleNoteChance = 0.20; timeGapMin = 0.25; timeGapMax = 0.50;
+      } else if (difficulty === 'normal') {
+        doubleNoteChance = 0.35; timeGapMin = 0.20; timeGapMax = 0.45;
+      } else if (difficulty === 'hard') {
+        doubleNoteChance = 0.55; timeGapMin = 0.15; timeGapMax = 0.35;
+      } else if (difficulty === 'hell') {
+        doubleNoteChance = 0.75; timeGapMin = 0.10; timeGapMax = 0.25; // ≥75%雙鍵
+      } else if (difficulty === 'ex') {
+        doubleNoteChance = 0.60; timeGapMin = 0.12; timeGapMax = 0.30;
+      }
 
-  if (!(difficulty === 'ex' || difficulty === 'hell')) {
-    while (time < durationSec) {
-      const lanesUsed = new Set();
-      const notesThisFrame = [];
-      const count = Math.random() < doubleNoteChance ? 2 : 1;
-      while (notesThisFrame.length < count) {
-        const lane = Math.floor(Math.random() * 4);
-        if (!lanesUsed.has(lane)) {
-          lanesUsed.add(lane);
-          notesThisFrame.push({ t: time, lane, type: 'tap', hit: false, y: -50 });
+      if (!(difficulty === 'ex' || difficulty === 'hell')) {
+        while (time < durationSec) {
+          const lanesUsed = new Set();
+          const notesThisFrame = [];
+          const count = Math.random() < doubleNoteChance ? 2 : 1;
+          while (notesThisFrame.length < count) {
+            const lane = Math.floor(Math.random() * 4);
+            if (!lanesUsed.has(lane)) {
+              lanesUsed.add(lane);
+              notesThisFrame.push({ t: time, lane, type: 'tap', hit: false, y: -50 });
+            }
+          }
+          chart.push(...notesThisFrame);
+          time += Math.random() * (timeGapMax - timeGapMin) + timeGapMin;
+        }
+        return;
+      }
+
+      // EX / HELL：更密集
+      const beat = 0.5; // 2 beats/sec
+      let t = 1;
+      let laneCursor = 0;
+      const nextLane = () => { laneCursor = (laneCursor + 1) % 4; return laneCursor; };
+      const pushNote = (tt, lane) => chart.push({ t: tt, lane, type: 'tap', hit: false, y: -50 });
+      const randLane = () => Math.floor(Math.random() * 4);
+
+      while (t < durationSec) {
+        if (difficulty === 'ex') {
+          pushNote(t, nextLane());
+          if (Math.random() < 0.60) pushNote(t, (laneCursor + 2) % 4);
+          if (Math.random() < 0.35) pushNote(t + beat / 2, (laneCursor + 1) % 4);
+          if (Math.random() < 0.18) {
+            pushNote(t + beat / 3, randLane());
+            pushNote(t + 2 * beat / 3, randLane());
+          }
+          t += Math.random() < 0.5 ? beat / 2 : beat;
+        } else {
+          pushNote(t, nextLane());
+          if (Math.random() < 0.85) pushNote(t, (laneCursor + 2) % 4); // ≥75%雙鍵
+          pushNote(t + beat / 2, (laneCursor + 1) % 4);
+          if (Math.random() < 0.4) {
+            pushNote(t + beat / 4, randLane());
+            pushNote(t + 3 * beat / 4, randLane());
+          }
+          t += beat / 2;
         }
       }
-      chart.push(...notesThisFrame);
-      time += Math.random() * (timeGapMax - timeGapMin) + timeGapMin;
     }
-    return;
-  }
 
-  // EX / HELL：以假定節拍（每秒 2 拍）做密集化，HELL 更密
-  const beat = 0.5; // 2 beats/sec
-  let t = 1;
-  let laneCursor = 0;
-  const nextLane = () => { laneCursor = (laneCursor + 1) % 4; return laneCursor; };
-  const pushNote = (tt, lane) => chart.push({ t: tt, lane, type: 'tap', hit: false, y: -50 });
-  const randLane = () => Math.floor(Math.random() * 4);
-
-  while (t < durationSec) {
-    if (difficulty === 'ex') {
-      pushNote(t, nextLane());
-      if (Math.random() < 0.6) pushNote(t, (laneCursor + 2) % 4); // 60% 雙鍵
-      if (Math.random() < 0.35) pushNote(t + beat / 2, (laneCursor + 1) % 4);
-      if (Math.random() < 0.18) {
-        pushNote(t + beat / 3, randLane());
-        pushNote(t + 2 * beat / 3, randLane());
+    /* ====== 位置計算（支援上下兩種方向） ====== */
+    function noteYAtTime(n, t) {
+      const dir = currentDirection;
+      const judgeLineY = getJudgeLineY();
+      if (dir === 'down') {
+        // 往下掉：t<n.t 時在上方；到 n.t 逼近打擊線
+        return judgeLineY - (n.t - t) * noteSpeed;
+      } else {
+        // 往上升：t<n.t 時在下方；到 n.t 逼近打擊線（線在頂）
+        return judgeLineY + (n.t - t) * noteSpeed;
       }
-      t += Math.random() < 0.5 ? beat / 2 : beat;
-    } else {
-      // HELL：雙鍵≥75%，更密，含 1/4 拍爆發
-      pushNote(t, nextLane());
-      if (Math.random() < 0.85) pushNote(t, (laneCursor + 2) % 4); // 85% 雙鍵
-      pushNote(t + beat / 2, (laneCursor + 1) % 4);
-      if (Math.random() < 0.4) {
-        pushNote(t + beat / 4, randLane());
-        pushNote(t + 3 * beat / 4, randLane());
+    }
+
+    function isMiss(n) {
+      const dir = currentDirection;
+      const judgeLineY = getJudgeLineY();
+      if (dir === 'down') {
+        return n.y > judgeLineY + MISS_Y_OFFSET; // 掉過線
+      } else {
+        return n.y < judgeLineY - MISS_Y_OFFSET; // 升過線
       }
-      t += beat / 2;
     }
-  }
-}
 
-/* ====== 更新 & 繪圖（支援上下兩種方向） ====== */
-function update(t) {
-  const dir = getNoteDirection(); // 'down' | 'up'
+    /* ====== 更新 & 繪圖 ====== */
+    function update(t) {
+      chart.forEach(n => { n.y = noteYAtTime(n, t); });
 
-  chart.forEach(n => {
-    if (dir === 'down') {
-      n.y = judgeLineY - (n.t - t) * noteSpeed; // 上 -> 下
-    } else {
-      n.y = judgeLineY + (n.t - t) * noteSpeed; // 下 -> 上（由線下往上靠近）
+      chart.forEach(n => {
+        if (n.hit) return;
+        if (isMiss(n)) {
+          n.hit = true;
+          miss();
+        }
+      });
     }
-  });
 
-  chart.forEach(n => {
-    if (n.hit) return;
-    if (getNoteDirection() === 'down') {
-      if (n.y > judgeLineY + MISS_Y_OFFSET) { n.hit = true; miss(); }
-    } else {
-      if (n.y < judgeLineY - MISS_Y_OFFSET) { n.hit = true; miss(); }
+    function render() {
+      const judgeLineY = getJudgeLineY();
+
+      ctx.clearRect(0, 0, W, H);
+      ctx.strokeStyle = '#fff';
+      ctx.beginPath();
+      ctx.moveTo(0, judgeLineY);
+      ctx.lineTo(W, judgeLineY);
+      ctx.stroke();
+
+      const laneColors = ['#b266ff', '#66ccff', '#66ff66', '#ff6666'];
+      chart.forEach(n => {
+        if (n.hit) return;
+        const x = n.lane * laneWidth + laneWidth / 2;
+        ctx.fillStyle = laneColors[n.lane];
+        ctx.beginPath();
+        ctx.arc(x, n.y, 30, 0, Math.PI * 2);
+        ctx.fill();
+      });
+
+      if (lastJudgementText !== '-') {
+        ctx.fillStyle = '#fff';
+        ctx.font = 'bold 32px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText(lastJudgementText, W / 2, (currentDirection === 'up') ? judgeLineY + 40 : judgeLineY - 40);
+      }
+
+      if (comboFlash) {
+        ctx.fillStyle = '#ff78b5';
+        ctx.font = 'bold 36px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText(comboFlash, W / 2, H / 2 - 100);
+      }
+
+      if (!running && chart.every(n => n.hit)) {
+        document.getElementById('finalSong').textContent = currentSongTitle;
+        document.getElementById('finalDiff').textContent = currentDifficulty.toUpperCase();
+        document.getElementById('finalDir').textContent  = (currentDirection === 'up' ? '上升' : '下落');
+        document.getElementById('finalJudge').textContent= (currentJudgeMode === 'old' ? 'Old' : 'New');
+        document.getElementById('finalScore').textContent = score;
+        document.getElementById('statPerfect').textContent = stats.perfect;
+        document.getElementById('statGreat').textContent = stats.great;
+        document.getElementById('statGood').textContent = stats.good;
+        document.getElementById('statBad').textContent = stats.bad;
+        document.getElementById('statWrong').textContent = stats.wrong;
+        document.getElementById('statMiss').textContent = stats.miss;
+
+        document.getElementById('gameScreen').style.display = 'none';
+        document.getElementById('endScreen').style.display = 'block';
+      }
     }
-  });
-}
 
-function render() {
-  ctx.clearRect(0, 0, W, H);
-  ctx.strokeStyle = '#fff';
-  ctx.beginPath();
-  ctx.moveTo(0, judgeLineY);
-  ctx.lineTo(W, judgeLineY);
-  ctx.stroke();
+    function loop(ts) {
+      if (paused) return;
+      const t = (ts - startTime) / 1000;
+      update(t);
+      render();
 
-  const laneColors = ['#b266ff', '#66ccff', '#66ff66', '#ff6666'];
-  chart.forEach(n => {
-    if (n.hit) return;
-    const x = n.lane * laneWidth + laneWidth / 2;
-    ctx.fillStyle = laneColors[n.lane];
-    ctx.beginPath();
-    ctx.arc(x, n.y, 30, 0, Math.PI * 2);
-    ctx.fill();
-  });
+      if (chart.every(n => n.hit)) {
+        running = false;
+        lastJudgementText = 'END';
+        updateHUD();
 
-  if (lastJudgementText !== '-') {
-    ctx.fillStyle = '#fff';
-    ctx.font = 'bold 32px sans-serif';
-    ctx.textAlign = 'center';
-    ctx.fillText(lastJudgementText, W / 2, judgeLineY - 40);
-  }
+        document.getElementById('finalSong').textContent = currentSongTitle;
+        document.getElementById('finalDiff').textContent = currentDifficulty.toUpperCase();
+        document.getElementById('finalDir').textContent  = (currentDirection === 'up' ? '上升' : '下落');
+        document.getElementById('finalJudge').textContent= (currentJudgeMode === 'old' ? 'Old' : 'New');
+        document.getElementById('finalScore').textContent = score;
+        document.getElementById('statPerfect').textContent = stats.perfect;
+        document.getElementById('statGreat').textContent = stats.great;
+        document.getElementById('statGood').textContent = stats.good;
+        document.getElementById('statBad').textContent = stats.bad;
+        document.getElementById('statWrong').textContent = stats.wrong;
+        document.getElementById('statMiss').textContent = stats.miss;
 
-  if (comboFlash) {
-    ctx.fillStyle = '#ff78b5';
-    ctx.font = 'bold 36px sans-serif';
-    ctx.textAlign = 'center';
-    ctx.fillText(comboFlash, W / 2, H / 2 - 100);
-  }
+        document.getElementById('gameScreen').style.display = 'none';
+        document.getElementById('endScreen').style.display = 'block';
+        return;
+      }
 
-  if (!running && chart.every(n => n.hit)) {
-    document.getElementById('finalSong').textContent = currentSongTitle;
-    document.getElementById('finalDiff').textContent = currentDifficulty.toUpperCase();
-    document.getElementById('finalScore').textContent = score;
-    document.getElementById('statPerfect').textContent = stats.perfect;
-    document.getElementById('statGreat').textContent = stats.great;
-    document.getElementById('statGood').textContent = stats.good;
-    document.getElementById('statBad').textContent = stats.bad;
-    document.getElementById('statWrong').textContent = stats.wrong;
-    document.getElementById('statMiss').textContent = stats.miss;
-
-    document.getElementById('gameScreen').style.display = 'none';
-    document.getElementById('endScreen').style.display = 'block';
-  }
-}
-
-function loop(ts) {
-  if (paused) return;
-  const t = (ts - startTime) / 1000;
-  update(t);
-  render();
-
-  if (chart.every(n => n.hit)) {
-    running = false;
-    lastJudgementText = 'END';
-    updateHUD();
-
-    document.getElementById('finalSong').textContent = currentSongTitle;
-    document.getElementById('finalDiff').textContent = currentDifficulty.toUpperCase();
-    document.getElementById('finalScore').textContent = score;
-    document.getElementById('statPerfect').textContent = stats.perfect;
-    document.getElementById('statGreat').textContent = stats.great;
-    document.getElementById('statGood').textContent = stats.good;
-    document.getElementById('statBad').textContent = stats.bad;
-    document.getElementById('statWrong').textContent = stats.wrong;
-    document.getElementById('statMiss').textContent = stats.miss;
-
-    document.getElementById('gameScreen').style.display = 'none';
-    document.getElementById('endScreen').style.display = 'block';
-    return;
-  }
-
-  loopId = requestAnimationFrame(loop);
-}
-
-/* ====== 輸入（鍵盤 + 手機觸控）====== */
-// 鍵盤
-window.addEventListener('keydown', e => {
-  const k = e.key.toLowerCase();
-  const idx = keys.indexOf(k);
-  if (idx !== -1) pressLane(idx);
-  if (e.key === 'Escape') { if (paused) resumeGame(); else pauseGame(); }
-});
-
-// 點 hit 圓鍵（手機 + 桌面）
-['d','f','j','k'].forEach((k, idx) => {
-  const el = document.getElementById('key-' + k);
-  el.addEventListener('pointerdown', (e) => { e.preventDefault(); pressLane(idx); }, { passive: false });
-});
-
-// 直接點 canvas 對應軌道（手機玩家好點）
-canvas.addEventListener('pointerdown', (e) => {
-  e.preventDefault();
-  const rect = canvas.getBoundingClientRect();
-  const x = e.clientX - rect.left;
-  const lane = Math.min(3, Math.max(0, Math.floor(x / laneWidth)));
-  pressLane(lane);
-}, { passive: false });
-
-function pressLane(lane) {
-  if (!running) return;
-
-  const tNow = (performance.now() - startTime) / 1000;
-  let targetIndex = -1;
-  let bestAbs = Infinity;
-
-  for (let i = 0; i < chart.length; i++) {
-    const n = chart[i];
-    if (n.hit) continue;
-    if (n.lane !== lane) continue;
-    const dtMs = (tNow - n.t) * 1000;
-    const adt = Math.abs(dtMs);
-    if (adt <= TOUCH_WINDOW_MS && adt < bestAbs) {
-      bestAbs = adt;
-      targetIndex = i;
-    }
-  }
-
-  if (targetIndex >= 0) {
-    const n = chart[targetIndex];
-    judge((tNow - n.t) * 1000);
-    n.hit = true;
-    flashKeyByLane(lane);
-  } else {
-    // WRONG 判定僅在 Old input 模式才啟動
-    if (getInputMode() === 'old') {
-      lastJudgementText = 'WRONG';
-      score = Math.max(0, score - 100);
-      combo = 0;
-      stats.wrong++;
-      updateHUD();
-      flashKeyByLane(lane);
-    } else {
-      // New input：忽略不處罰
-      flashKeyByLane(lane);
-    }
-  }
-}
-
-/* ====== UI / 流程 ====== */
-function showCountdown(callback) {
-  const countdownText = document.getElementById('countdownText');
-  const steps = ['Ready', '3', '2', '1', 'Go!'];
-  let i = 0;
-
-  function nextStep() {
-    if (i >= steps.length) {
-      countdownText.style.display = 'none';
-      callback();
-      return;
-    }
-    countdownText.textContent = steps[i];
-    countdownText.style.display = 'block';
-    countdownText.classList.remove('countdown');
-    void countdownText.offsetWidth;
-    countdownText.classList.add('countdown');
-    i++;
-    setTimeout(nextStep, 700);
-  }
-  nextStep();
-}
-
-function startGame() {
-  const difficulty = document.getElementById('difficultySelect').value;
-  currentDifficulty = difficulty;
-  const speedMultiplierSelect = document.getElementById('speedMultiplier');
-  let multiplier = parseFloat(speedMultiplierSelect.value);
-  if (difficulty === 'beginner') multiplier = 0.8;
-  else if (difficulty === 'easy')  multiplier = 0.9;
-  else if (difficulty === 'ex')    multiplier = 1.8;
-  noteSpeed = baseNoteSpeed * multiplier;
-
-  document.body.classList.toggle('ex-mode', difficulty === 'ex');
-
-  // 重置
-  try { bgm.pause(); } catch {}
-  cancelAnimationFrame(loopId);
-  score = 0; combo = 0; lastJudgementText = '-'; comboFlash = '';
-  chart = []; paused = false; running = true; missCount = 0; gameOver = false;
-  stats = { perfect:0, great:0, good:0, bad:0, wrong:0, miss:0 };
-  elapsedTimeBeforePause = 0;
-  updateHUD();
-
-  // 隨機選歌
-  const pick = SONGS[Math.floor(Math.random() * SONGS.length)];
-  currentSongTitle = pick.replace(/\.mp3$/i, '');
-  const url = 'music/' + encodeURIComponent(pick);
-  bgm.src = url;
-  bgm.load();
-
-  // metadata 取得長度後 → 用歌曲完整時長產譜
-  bgm.onloadedmetadata = () => {
-    const durationSec = (!isNaN(bgm.duration) && bgm.duration > 0) ? bgm.duration : 180;
-    generateChart(durationSec);
-    updateHUD();
-
-    // 顯示畫面
-    document.getElementById('menuScreen').style.display = 'none';
-    document.getElementById('optionsScreen').style.display = 'none';
-    document.getElementById('endScreen').style.display = 'none';
-    document.getElementById('pauseScreen').style.display = 'none';
-    document.getElementById('gameScreen').style.display = 'block';
-    document.getElementById('gameScreen').classList.remove('blur');
-
-    // 倒數 -> 同步開始
-    showCountdown(() => {
-      startTime = performance.now();
-      bgm.currentTime = 0;
-      bgm.play().catch(()=>{});
       loopId = requestAnimationFrame(loop);
+    }
+
+    /* ====== 輸入 ====== */
+    window.addEventListener('keydown', e => {
+      const k = e.key.toLowerCase();
+      const idx = keys.indexOf(k);
+      if (idx !== -1) { pressLane(idx); }
+      if (e.key === 'Escape') { paused ? resumeGame() : pauseGame(); }
     });
-  };
-}
 
-function pauseGame() {
-  if (!running || paused) return;
-  paused = true;
-  try { bgm.pause(); } catch {}
-  cancelAnimationFrame(loopId);
-  elapsedTimeBeforePause = (performance.now() - startTime) / 1000;
-  document.getElementById('gameScreen').classList.add('blur');
-  document.getElementById('gameScreen').style.display = 'none';
-  document.getElementById('pauseScreen').style.display = 'block';
-}
+    ['d','f','j','k'].forEach((k, idx) => {
+      const el = document.getElementById('key-' + k);
+      el.addEventListener('pointerdown', (e) => { e.preventDefault(); pressLane(idx); }, { passive: false });
+    });
 
-function resumeGame() {
-  if (!paused) return;
-  paused = false;
-  document.getElementById('pauseScreen').style.display = 'none';
-  document.getElementById('gameScreen').style.display = 'block';
-  document.getElementById('gameScreen').classList.remove('blur');
+    canvas.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      const rect = canvas.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const lane = Math.min(3, Math.max(0, Math.floor(x / laneWidth)));
+      pressLane(lane);
+    }, { passive: false });
 
-  showCountdown(() => {
-    startTime = performance.now() - (elapsedTimeBeforePause * 1000);
-    bgm.play().catch(()=>{});
-    loopId = requestAnimationFrame(loop);
-  });
-}
+    function pressLane(lane) {
+      if (!running) return;
 
-function goToMenu() {
-  document.getElementById('endScreen').style.display = 'none';
-  document.getElementById('gameScreen').style.display = 'none';
-  document.getElementById('optionsScreen').style.display = 'none';
-  document.getElementById('pauseScreen').style.display = 'none';
-  document.getElementById('menuScreen').style.display = 'block';
-  document.getElementById('gameScreen').classList.remove('blur');
-  document.body.classList.remove('ex-mode');
-  try { bgm.pause(); } catch {}
-}
+      const tNow = (performance.now() - startTime) / 1000;
+      let targetIndex = -1, bestAbs = Infinity;
 
-function showOptions() {
-  document.getElementById('menuScreen').style.display = 'none';
-  document.getElementById('optionsScreen').style.display = 'block';
-}
+      for (let i = 0; i < chart.length; i++) {
+        const n = chart[i];
+        if (n.hit || n.lane !== lane) continue;
+        const dtMs = (tNow - n.t) * 1000;
+        const adt = Math.abs(dtMs);
+        if (adt <= TOUCH_WINDOW_MS && adt < bestAbs) {
+          bestAbs = adt; targetIndex = i;
+        }
+      }
 
-/* 禁右鍵、禁縮放（iOS/Android） */
-document.addEventListener('contextmenu', e => e.preventDefault());
-document.addEventListener('gesturestart', e => e.preventDefault());
-document.addEventListener('dblclick', e => e.preventDefault());
+      if (targetIndex >= 0) {
+        const n = chart[targetIndex];
+        judge((tNow - n.t) * 1000);
+        n.hit = true;
+        flashKeyByLane(lane);
+      } else {
+        // 沒有在判定窗內的音符
+        if (currentJudgeMode === 'old') {
+          lastJudgementText = 'WRONG';
+          score = Math.max(0, score - 100);
+          combo = 0;
+          stats.wrong++;
+          updateHUD();
+        }
+        flashKeyByLane(lane);
+      }
+    }
+
+    /* ====== 倒數 ====== */
+    function showCountdown(callback) {
+      const countdownText = document.getElementById('countdownText');
+      const steps = ['Ready', '3', '2', '1', 'Go!'];
+      let i = 0;
+      function nextStep() {
+        if (i >= steps.length) { countdownText.style.display = 'none'; callback(); return; }
+        countdownText.textContent = steps[i];
+        countdownText.style.display = 'block';
+        countdownText.classList.remove('countdown'); void countdownText.offsetWidth;
+        countdownText.classList.add('countdown');
+        i++; setTimeout(nextStep, 700);
+      }
+      nextStep();
+    }
+
+    /* ====== 流程 ====== */
+    function startGame() {
+      // 設定與 HUD
+      const difficulty = document.getElementById('difficultySelect').value;
+      const speedMultiplierSelect = document.getElementById('speedMultiplier');
+      const dir = document.getElementById('noteDirection').value;
+      const jmode = document.getElementById('judgeMode').value;
+      currentDifficulty = difficulty;
+      currentDirection  = dir;
+      currentJudgeMode  = jmode;
+
+      let multiplier = parseFloat(speedMultiplierSelect.value);
+      if      (difficulty === 'beginner') multiplier = 0.8;
+      else if (difficulty === 'easy')     multiplier = 0.9;
+      else if (difficulty === 'ex')       multiplier = 1.8;
+      noteSpeed = baseNoteSpeed * multiplier;
+
+      document.body.classList.toggle('ex-mode', difficulty === 'ex');
+
+      // 重置狀態
+      try { bgm.pause(); } catch {}
+      cancelAnimationFrame(loopId);
+      score = 0; combo = 0; lastJudgementText = '-'; comboFlash = '';
+      chart = []; paused = false; running = true; missCount = 0; gameOver = false;
+      stats = { perfect:0, great:0, good:0, bad:0, wrong:0, miss:0 };
+      elapsedTimeBeforePause = 0;
+      updateHUD();
+
+      // 隨機選歌
+      const pick = SONGS[Math.floor(Math.random() * SONGS.length)];
+      currentSongTitle = pick.replace(/\.mp3$/i, '');
+      const url = 'music/' + encodeURIComponent(pick);
+      bgm.src = url;
+      bgm.load();
+
+      // 畫面切換
+      document.getElementById('menuScreen').style.display = 'none';
+      document.getElementById('optionsScreen').style.display = 'none';
+      document.getElementById('endScreen').style.display = 'none';
+      document.getElementById('pauseScreen').style.display = 'none';
+      document.getElementById('gameScreen').style.display = 'block';
+      document.getElementById('gameScreen').classList.remove('blur');
+      updateHUD();
+
+      // 先用安全預設 120 秒生成，metadata 到時再「覆蓋重產」
+      let chartFinalized = false;
+      generateChart(120);
+
+      bgm.onloadedmetadata = () => {
+        if (chartFinalized) return;
+        const durationSec = (!isNaN(bgm.duration) && bgm.duration > 0) ? bgm.duration : 120;
+        generateChart(durationSec);
+        chartFinalized = true;
+      };
+
+      // 倒數後立即開始（降低等待）
+      showCountdown(() => {
+        startTime = performance.now();
+        bgm.currentTime = 0;
+        bgm.play().catch(()=>{});
+        loopId = requestAnimationFrame(loop);
+      });
+    }
+
+    function pauseGame() {
+      if (!running || paused) return;
+      paused = true;
+      try { bgm.pause(); } catch {}
+      cancelAnimationFrame(loopId);
+      elapsedTimeBeforePause = (performance.now() - startTime) / 1000;
+      document.getElementById('gameScreen').classList.add('blur');
+      document.getElementById('gameScreen').style.display = 'none';
+      document.getElementById('pauseScreen').style.display = 'block';
+    }
+
+    function resumeGame() {
+      if (!paused) return;
+      paused = false;
+      document.getElementById('pauseScreen').style.display = 'none';
+      document.getElementById('gameScreen').style.display = 'block';
+      document.getElementById('gameScreen').classList.remove('blur');
+
+      showCountdown(() => {
+        startTime = performance.now() - (elapsedTimeBeforePause * 1000);
+        bgm.play().catch(()=>{});
+        loopId = requestAnimationFrame(loop);
+      });
+    }
+
+    function goToMenu() {
+      document.getElementById('endScreen').style.display = 'none';
+      document.getElementById('gameScreen').style.display = 'none';
+      document.getElementById('optionsScreen').style.display = 'none';
+      document.getElementById('pauseScreen').style.display = 'none';
+      document.getElementById('menuScreen').style.display = 'block';
+      document.getElementById('gameScreen').classList.remove('blur');
+      document.body.classList.remove('ex-mode');
+      try { bgm.pause(); } catch {}
+    }
+
+    function showOptions() {
+      document.getElementById('menuScreen').style.display = 'none';
+      document.getElementById('optionsScreen').style.display = 'block';
+    }
+
+    // 禁右鍵 / 禁縮放
+    document.addEventListener("contextmenu", e => e.preventDefault());
+    document.addEventListener('gesturestart', e => e.preventDefault());
+    document.addEventListener('dblclick', e => e.preventDefault());
   </script>
 </body>
 </html>
+
 
 
 
