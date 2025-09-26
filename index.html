@@ -14,6 +14,7 @@
       text-align: center;
       touch-action: manipulation;
       transition: background 0.5s ease;
+      -webkit-tap-highlight-color: transparent;
     }
     body.ex-mode {
       background: linear-gradient(to bottom, #ff3300, #990000, #000000);
@@ -33,6 +34,7 @@
       width: 95%;
       max-width: 420px;
       height: auto;
+      touch-action: none;
     }
     .hitbar {
       display: flex;
@@ -44,6 +46,7 @@
       height: 90px;
       position: relative;
       z-index: 2;
+      user-select: none;
     }
     .hitkey {
       flex: 1;
@@ -58,6 +61,9 @@
       align-items: center;
       justify-content: center;
       transition: transform 0.2s, box-shadow 0.2s;
+      user-select: none;
+      -webkit-user-select: none;
+      touch-action: manipulation;
     }
     #key-d { color: #b266ff; border-color: #b266ff; }
     #key-f { color: #66ccff; border-color: #66ccff; }
@@ -71,6 +77,7 @@
     .hud {
       font-size: 18px;
       margin-top: 10px;
+      user-select: none;
     }
     button {
       margin: 10px;
@@ -106,6 +113,7 @@
       text-shadow: 2px 2px 8px #000;
       z-index: 5;
       animation: pop 0.6s ease-out;
+      user-select: none;
     }
     @keyframes pop {
       0% { transform: scale(0.5) translate(-50%, -50%); opacity: 0; }
@@ -184,40 +192,13 @@
   <div id="countdownText" class="countdown" style="display:none;"></div>
 
   <audio id="hitSound" src="https://cdn.pixabay.com/download/audio/2022/03/15/audio_6e3e3b6f3f.mp3?filename=click-124467.mp3"></audio>
-  <audio id="bgm"></audio> <!-- ✅ 播放隨機選歌 -->
+
+  <!-- 這個 src 會在開始遊戲時被覆蓋成隨機歌曲 -->
+  <audio id="bgm" src=""></audio>
+
   <script>
 /* ----------------------------
-   🎵 歌曲清單（放在 /music/）
-   - 會於開始遊戲時隨機挑一首並播放
-   - 使用 encodeURI 確保路徑可用
------------------------------*/
-const SONGS = [
-  { title: "Charlie Puth - Light Switch", file: "Charlie Puth - Light Switch [Official Music Video] - Charlie Puth.mp3" },
-  { title: "Creepy Nuts - オトノケ (Otonoke)", file: "Creepy Nuts - オトノケ(Otonoke) 【Official MV】 [Dandadan OP] - Creepy Nuts.mp3" },
-  { title: "Creepy Nuts - Mirage (Call of the Night OP)", file: "Creepy Nuts ”Mirage” × Anime ”Call of the Night” Collaboration Music Video Opening Theme Song - Creepy Nuts.mp3" },
-  { title: "Creepy Nuts - Nemure (Call of the Night ED)", file: "Creepy Nuts ”Nemure” × Anime ”Call of the Night” Collaboration Music Video Ending Theme Song - Creepy Nuts (1).mp3" },
-  { title: "Creepy Nuts - Bling-Bang-Bang-Born", file: "Creepy Nuts｢Bling-Bang-Bang-Born｣ × TV Anime｢マッシュル-MASHLE-｣ Collaboration Music Video #BBBBダンス - Creepy Nuts.mp3" },
-  { title: "KANA-BOON - Silhouette", file: "KANA-BOON - Silhouette - KANABOONVEVO.mp3" },
-  { title: "Lost Sky - Fearless pt.II (feat. Chris Linton)", file: "Lost Sky - Fearless pt.II (feat. Chris Linton) Trap NCS - Copyright Free Music - NoCopyrightSounds.mp3" },
-  { title: "Lost Sky - Vision pt. II (feat. She Is Jules)", file: "Lost Sky - Vision pt. II (feat. She Is Jules) Future Trap NCS - Copyright Free Music - NoCopyrightSounds.mp3" },
-  { title: "Lost Sky - Where We Started (feat. Jex)", file: "Lost Sky - Where We Started (feat. Jex) Melodic Dubstep NCS - Copyright Free Music - NoCopyrightSounds.mp3" },
-  { title: "Lost Sky, Sara Skinner - Dreams pt. II [NCS]", file: "Lost Sky, Sara Skinner - Dreams pt. II (feat. Sara Skinner) [NCS Release].mp3" },
-  { title: "OneRepublic - Nobody (Kaiju No. 8)", file: "OneRepublic - Nobody (from Kaiju No. 8) [Official Music Video] - OneRepublicVEVO.mp3" },
-  { title: "YOASOBI - Watch me!", file: "YOASOBI「Watch me!」Official Music Video - Ayase _ YOASOBI.mp3" },
-  { title: "yung kai - blue", file: "yung kai - blue (official music video) - yung kai.mp3" },
-  { title: "AKASAKI - Bunny Girl", file: "【AKASAKI】Bunny Girl _ バニーガール（Lyric Video） - AKASAKI (19).mp3" },
-  { title: "ゆーり - 隙", file: "【MV】隙_ゆーり【オリジナル】 - ゆーり🍎🐥〔24〕・yuri (1).mp3" },
-  { title: "imase - NIGHT DANCER", file: "【imase】NIGHT DANCER（MV） - imase.mp3" },
-  { title: "しぐれうい - 粛聖!! ロリ神レクイエム☆", file: "【オリジナル楽曲】粛聖!! ロリ神レクイエム☆ _ しぐれうい（9さい）【IOSYS（まろん&D.watt）】 - しぐれうい.mp3" },
-  { title: "なとり - Overdose", file: "なとり - Overdose - なとり _ natori.mp3" },
-  { title: "ロクデナシ - ただ声一つ (One Voice)", file: "ロクデナシ「ただ声一つ」_ Rokudenashi - One Voice【Official Music Video】 - ロクデナシ _ Rokudenashi.mp3" },
-  { title: "ユイカ - 好きだから。", file: "好きだから。_ 『ユイカ』【MV】 - 『ユイカ』.mp3" },
-  { title: "Eve - 廻廻奇譚", file: "廻廻奇譚 - Eve MV - Eve.mp3" },
-  { title: "キタニタツヤ - 青のすみか (Where Our Blue Is)", file: "青のすみか _ キタニタツヤ - Where Our Blue Is _ Tatsuya Kitani - キタニタツヤ _ Tatsuya Kitani.mp3" },
-];
-
-/* ----------------------------
-   🎮 既有元素與變數（沿用你的結構）
+   Canvas 與基本設定
 -----------------------------*/
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
@@ -229,6 +210,9 @@ const judgeLineY = H - hitkeyHeight / 2;
 const keys = ['d','f','j','k'];
 const keyDown = new Set();
 
+/* ----------------------------
+   遊戲狀態變數
+-----------------------------*/
 let score = 0, combo = 0, lastJudgementText = '-';
 let startTime = 0, running = false;
 let chart = [];
@@ -238,30 +222,39 @@ let paused = false;
 let lastTouchTime = {};
 let elapsedTimeBeforePause = 0;
 
+/* ----------------------------
+   音效與歌曲
+-----------------------------*/
 const hitSound = document.getElementById('hitSound');
 const bgm = document.getElementById('bgm');
 let baseNoteSpeed = 550;
 let noteSpeed = baseNoteSpeed;
 
-// ---- 判定與錯誤冷卻常數 ----
+/* ----------------------------
+   判定與防誤觸常數
+-----------------------------*/
 const JUDGE_WINDOW_MS = 200;
 const MISS_Y_OFFSET = 40;
 const WRONG_COOLDOWN_MS = 400;
 const TOUCH_WINDOW_MS = 200;
 const NEAR_WINDOW_MS = JUDGE_WINDOW_MS + 60;
 
-// ---- 統計 & 失敗一次性保險 ----
+/* ----------------------------
+   統計 & 失敗一次性保險
+-----------------------------*/
 let lastWrongTime = {};
 let missCount = 0;
 let gameOver = false;
 let stats = { perfect:0, great:0, good:0, bad:0, wrong:0, miss:0 };
 
-// ✅ EX 專用：BPM 與起始延遲（保留，可日後用到）
+/* ----------------------------
+   EX 設定（保留原本）
+-----------------------------*/
 const EX_SONG_BPM = 140;
 const EX_OFFSET   = 1.0;
 let songDuration  = 215;
 
-// 取得歌曲實際長度（隨機選歌後才會被觸發）
+/* 實際長度（載入後覆蓋） */
 bgm.addEventListener('loadedmetadata', () => {
   if (!isNaN(bgm.duration) && bgm.duration > 0) {
     songDuration = bgm.duration;
@@ -269,33 +262,63 @@ bgm.addEventListener('loadedmetadata', () => {
 });
 
 /* ----------------------------
-   🔀 隨機選歌與顯示
+   🎶 歌曲清單（放在 /music）
 -----------------------------*/
+const SONGS = [
+  "Charlie Puth - Light Switch [Official Music Video] - Charlie Puth.mp3",
+  "Creepy Nuts - オトノケ(Otonoke) 【Official MV】 [Dandadan OP] - Creepy Nuts.mp3",
+  "Creepy Nuts ”Mirage” × Anime ”Call of the Night” Collaboration Music Video Opening Theme Song - Creepy Nuts.mp3",
+  "Creepy Nuts ”Nemure” × Anime ”Call of the Night” Collaboration Music Video Ending Theme Song - Creepy Nuts (1).mp3",
+  "Creepy Nuts｢Bling-Bang-Bang-Born｣ × TV Anime｢マッシュル-MASHLE-｣ Collaboration Music Video #BBBBダンス - Creepy Nuts.mp3",
+  "KANA-BOON - Silhouette - KANABOONVEVO.mp3",
+  "Lost Sky - Fearless pt.II (feat. Chris Linton) Trap NCS - Copyright Free Music - NoCopyrightSounds.mp3",
+  "Lost Sky - Vision pt. II (feat. She Is Jules) Future Trap NCS - Copyright Free Music - NoCopyrightSounds.mp3",
+  "Lost Sky - Where We Started (feat. Jex) Melodic Dubstep NCS - Copyright Free Music - NoCopyrightSounds.mp3",
+  "Lost Sky, Sara Skinner - Dreams pt. II (feat. Sara Skinner) [NCS Release].mp3",
+  "OneRepublic - Nobody (from Kaiju No. 8) [Official Music Video] - OneRepublicVEVO.mp3",
+  "YOASOBI「Watch me!」Official Music Video - Ayase _ YOASOBI.mp3",
+  "yung kai - blue (official music video) - yung kai.mp3",
+  "【AKASAKI】Bunny Girl _ バニーガール（Lyric Video） - AKASAKI (19).mp3",
+  "【MV】隙_ゆーり【オリジナル】 - ゆーり🍎🐥〔24〕・yuri (1).mp3",
+  "【imase】NIGHT DANCER（MV） - imase.mp3",
+  "【オリジナル楽曲】粛聖!! ロリ神レクイエム☆ _ しぐれうい（9さい）【IOSYS（まろん&D.watt）】 - しぐれうい.mp3",
+  "なとり - Overdose - なとり _ natori.mp3",
+  "ロクデナシ「ただ声一つ」_ Rokudenashi - One Voice【Official Music Video】 - ロクデナシ _ Rokudenashi.mp3",
+  "好きだから。_ 『ユイカ』【MV】 - 『ユイカ』.mp3",
+  "廻廻奇譚 - Eve MV - Eve.mp3",
+  "青のすみか _ キタニタツヤ - Where Our Blue Is _ Tatsuya Kitani - キタニタツヤ _ Tatsuya Kitani.mp3"
+];
+
+/* 隨機挑歌並設 src */
 function pickRandomSong() {
-  const idx = Math.floor(Math.random() * SONGS.length);
-  return SONGS[idx];
-}
-function setSongAndPlay() {
-  const song = pickRandomSong();
-  const src = 'music/' + encodeURI(song.file);
-  bgm.src = src;
-  // 可選：你若想在 HUD 顯示曲名，可加一個 <div id="songTitle"></div> 然後：
-  // document.getElementById('songTitle').textContent = song.title;
-  // 為確保從頭開始播放
-  try { bgm.pause(); } catch {}
+  const song = SONGS[Math.floor(Math.random() * SONGS.length)];
+  bgm.src = "music/" + encodeURIComponent(song);
+  // 重新載入並把時間歸零
+  try { bgm.load(); } catch(e) {}
   bgm.currentTime = 0;
-  bgm.play();
 }
 
 /* ----------------------------
-   鍵盤與觸控事件
+   📱 行動裝置音訊解鎖
+-----------------------------*/
+document.body.addEventListener("touchstart", () => {
+  bgm.play().then(() => {
+    bgm.pause();
+    bgm.currentTime = 0;
+  }).catch(e => console.log("音訊解鎖失敗：", e));
+}, { once: true });
+
+/* ----------------------------
+   鍵盤事件
 -----------------------------*/
 window.addEventListener('keydown', e => {
   const k = e.key.toLowerCase();
-  if (keys.includes(k)) keyDown.add(k);
+  if (keys.includes(k)) {
+    keyDown.add(k);
+    processPress(k);
+  }
   if (e.key === 'Escape') {
-    if (paused) resumeGame();
-    else pauseGame();
+    if (paused) resumeGame(); else pauseGame();
   }
 });
 window.addEventListener('keyup', e => {
@@ -303,27 +326,33 @@ window.addEventListener('keyup', e => {
   if (keys.includes(k)) keyDown.delete(k);
 });
 
-// 觸控事件（點擊圓鍵）
+/* ----------------------------
+   觸控事件（點擊圓鍵）
+-----------------------------*/
 keys.forEach(k => {
   const el = document.getElementById('key-' + k);
   el.addEventListener('touchstart', e => {
     e.preventDefault();
     const now = Date.now();
-    if (lastTouchTime[k] && now - lastTouchTime[k] < 100) return;
+    if (lastTouchTime[k] && now - lastTouchTime[k] < 80) return;
     lastTouchTime[k] = now;
     processPress(k);
   }, { passive: false });
+  // 滑鼠也支援點擊
+  el.addEventListener('mousedown', e => {
+    e.preventDefault();
+    processPress(k);
+  });
 });
 
 /* ----------------------------
-   HUD 與打擊、MISS、WRONG
+   HUD & 特效
 -----------------------------*/
 function updateHUD() {
   document.getElementById('score').textContent = score;
   document.getElementById('combo').textContent = combo;
   document.getElementById('judgement').textContent = lastJudgementText;
 }
-
 function flashKey(k) {
   const el = document.getElementById('key-' + k);
   if (!el) return;
@@ -331,21 +360,23 @@ function flashKey(k) {
   setTimeout(() => el.classList.remove('flash'), 150);
 }
 
+/* ----------------------------
+   判定邏輯
+-----------------------------*/
 function judge(dtMs, laneKey) {
   const adt = Math.abs(dtMs);
   let j = 'GOOD', add = 300;
 
   if (adt <= 50)      { j = 'PERFECT'; add = 1000; stats.perfect++; }
-  else if (adt <= 100){ j = 'GREAT';   add =  600; stats.great++;   }
-  else if (adt <= 150){ j = 'GOOD';    add =  300; stats.good++;    }
-  else                { j = 'BAD';     add =  100; stats.bad++;     }
+  else if (adt <= 100){ j = 'GREAT';   add = 600;  stats.great++;   }
+  else if (adt <= 150){ j = 'GOOD';    add = 300;  stats.good++;    }
+  else                { j = 'BAD';     add = 100;  stats.bad++;     }
 
   score += add;
   combo += 1;
   lastJudgementText = j;
   updateHUD();
-  hitSound.currentTime = 0;
-  hitSound.play();
+  try { hitSound.currentTime = 0; hitSound.play(); } catch(e) {}
   flashKey(laneKey);
   if (combo % 10 === 0) {
     comboFlash = `COMBO x${combo}!!`;
@@ -372,13 +403,10 @@ function triggerFailOnce(msg) {
   running = false;
   try { cancelAnimationFrame(loopId); } catch {}
   try { bgm.pause(); } catch {}
-  setTimeout(() => {
-    alert(msg);
-    goToMenu();
-  }, 0);
+  setTimeout(() => { alert(msg); goToMenu(); }, 0);
 }
 
-// 錯鍵處罰（不計入 MISS），近拍保護
+/* 錯鍵處罰（不計入 MISS），加入近拍保護 */
 function checkRandomHit(t) {
   const nowMs = performance.now();
   keys.forEach(k => {
@@ -393,7 +421,7 @@ function checkRandomHit(t) {
     );
 
     if (!hasValidNote) {
-      if (hasNearNote) return; // 近拍保護
+      if (hasNearNote) return; // 近拍保護：提早壓不扣
       if (!lastWrongTime[k] || nowMs - lastWrongTime[k] > WRONG_COOLDOWN_MS) {
         lastWrongTime[k] = nowMs;
         lastJudgementText = 'WRONG';
@@ -408,14 +436,48 @@ function checkRandomHit(t) {
   });
 }
 
+/* 主動按鍵處理（鍵盤/觸控/滑鼠統一） */
+function processPress(k) {
+  if (!running) return;
+  const nowT = (performance.now() - startTime) / 1000;
+  let nearest = null;
+  let bestAbs = Infinity;
+  for (let i = 0; i < chart.length; i++) {
+    const n = chart[i];
+    if (n.hit) continue;
+    if (keys[n.lane] !== k) continue;
+    const absDt = Math.abs((nowT - n.t) * 1000);
+    if (absDt <= TOUCH_WINDOW_MS && absDt < bestAbs) {
+      bestAbs = absDt;
+      nearest = n;
+    }
+  }
+  if (nearest) {
+    judge((nowT - nearest.t) * 1000, k);
+    nearest.hit = true;
+  } else {
+    const nowMs = performance.now();
+    if (!lastWrongTime[k] || nowMs - lastWrongTime[k] > WRONG_COOLDOWN_MS) {
+      lastWrongTime[k] = nowMs;
+      lastJudgementText = 'WRONG';
+      score = Math.max(0, score - 100);
+      combo = 0;
+      stats.wrong++;
+      updateHUD();
+      flashKey(k);
+    }
+  }
+}
+
 /* ----------------------------
-   譜面生成（維持你原本：非 EX 隨機、EX 走拍）
+   譜面生成（保留你的版本）
 -----------------------------*/
 function generateChart() {
   chart = [];
   const difficulty = document.getElementById('difficultySelect').value;
 
   if (difficulty !== 'ex') {
+    // 原本隨機譜面（非 EX）
     let time = 1;
     const endTime = Math.random() * 20 + 110;
     let doubleNoteChance = 0.35;
@@ -451,7 +513,7 @@ function generateChart() {
     return;
   }
 
-  // EX：依 BPM + 分段產生（保留）
+  // EX：依 BPM + 分段產生
   generateEXChartByBPM(EX_SONG_BPM, EX_OFFSET, songDuration);
 }
 
@@ -471,6 +533,7 @@ function generateEXChartByBPM(bpm, offset, durationSec) {
 
   let laneCursor = 0;
   const nextLane = () => { laneCursor = (laneCursor + 1) % 4; return laneCursor; };
+
   let beatsSinceJack = 0;
 
   while (t <= endTime) {
@@ -485,9 +548,7 @@ function generateEXChartByBPM(bpm, offset, durationSec) {
     else if (section === 'chorus') {
       pushNote(t, nextLane());
       pushNote(t, (laneCursor + 1) % 4);
-      if (Math.random() < 0.25) {
-        pushNote(t + beat / 2, (laneCursor + 2) % 4);
-      }
+      if (Math.random() < 0.25) pushNote(t + beat / 2, (laneCursor + 2) % 4);
       if (Math.random() < 0.18) {
         pushNote(t + beat / 3, randLane());
         pushNote(t + 2 * beat / 3, randLane());
@@ -499,14 +560,18 @@ function generateEXChartByBPM(bpm, offset, durationSec) {
       pushNote(t, randLane());
       pushNote(t + beat / 3, (laneCursor + 1) % 4);
       pushNote(t + 2 * beat / 3, (laneCursor + 2) % 4);
+
       if (Math.random() < 0.55) pushNote(t, (laneCursor + 3) % 4);
-      if (Math.random() < 0.5)  pushNote(t + beat / 2, nextLane());
+
+      if (Math.random() < 0.5) pushNote(t + beat / 2, nextLane());
+
       if (Math.random() < 0.35) {
         const lanes = [0,1,2,3];
         for (let i = 1; i <= 3; i++) {
           pushNote(t + i * (beat / 4), lanes[(laneCursor + i) % 4]);
         }
       }
+
       t += beat / 2;
       beatsSinceJack += 0.5;
 
@@ -635,7 +700,7 @@ function loop(ts) {
 }
 
 /* ----------------------------
-   UI / 流程
+   UI/流程
 -----------------------------*/
 function showCountdown(callback) {
   const countdownText = document.getElementById('countdownText');
@@ -661,6 +726,8 @@ function showCountdown(callback) {
 }
 
 function startGame() {
+  pickRandomSong(); // 🎶 每局開場隨機歌曲
+
   const difficulty = document.getElementById('difficultySelect').value;
   const speedMultiplierSelect = document.getElementById('speedMultiplier');
   let multiplier = parseFloat(speedMultiplierSelect.value);
@@ -669,10 +736,7 @@ function startGame() {
   else if (difficulty === 'ex')    multiplier = 1.8;
   noteSpeed = baseNoteSpeed * multiplier;
 
-  document.body.classList.remove('ex-mode');
-  if (difficulty === 'ex') {
-    document.body.classList.add('ex-mode');
-  }
+  document.body.classList.toggle('ex-mode', difficulty === 'ex');
 
   try { bgm.pause(); } catch {}
   bgm.currentTime = 0;
@@ -704,10 +768,9 @@ function startGame() {
 
   showCountdown(() => {
     startTime = performance.now();
-
-    // ✅ 每一種難度都會自動隨機選歌並播放
-    setSongAndPlay();
-
+    // ✅ 所有難度都播放音樂
+    bgm.currentTime = 0;
+    bgm.play().catch(e => console.log('play 失敗：', e));
     loopId = requestAnimationFrame(loop);
   });
 }
@@ -732,7 +795,7 @@ function resumeGame() {
 
   showCountdown(() => {
     startTime = performance.now() - (elapsedTimeBeforePause * 1000);
-    try { bgm.play(); } catch {}
+    bgm.play().catch(e => console.log('resume play 失敗：', e));
     loopId = requestAnimationFrame(loop);
   });
 }
@@ -753,12 +816,13 @@ function showOptions() {
   document.getElementById('optionsScreen').style.display = 'block';
 }
 
-document.addEventListener("contextmenu", function(e) {
-  e.preventDefault();
-});
+/* 停用長按選單與雙指縮放等干擾 */
+document.addEventListener("contextmenu", e => e.preventDefault());
+document.addEventListener("gesturestart", e => e.preventDefault());
   </script>
 </body>
 </html>
+
 
 
 
