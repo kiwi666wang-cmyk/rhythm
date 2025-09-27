@@ -205,7 +205,7 @@
     // 統計
     let missCount = 0;
     let gameOver = false;
-     let stats = { sick:0, good:0, bad:0, shit:0, miss:0 };
+    let stats = { sick:0, good:0, bad:0, shit:0, miss:0 };
 
     // 當前資訊
     let currentSongTitle = '-';
@@ -261,7 +261,7 @@
     }
 
     /* ====== 判定 ====== */
-     function judge(dtMs) {
+    function judge(dtMs) {
       const adt = Math.abs(dtMs);
       let rating = '';
       let scoreDelta = 0;
@@ -456,12 +456,17 @@
     function update(t) {
       chart.forEach(n => { n.y = noteYAtTime(n, t); });
 
-      chart.forEach(n => {␊
-        if (n.hit) return;␊
+      chart.forEach(n => {
+
+        if (n.hit) return;
+
         if (isMiss(n, t)) {
-          n.hit = true;␊
-          miss();␊
-        }␊
+          n.hit = true;
+
+          miss();
+
+        }
+
       });
     }
 
@@ -578,11 +583,11 @@
       pressLane(lane);
     }, { passive: false });
 
-    function pressLane(lane) {␊
-      if (!running) return;␊
-␊
-      const tNow = (performance.now() - startTime) / 1000;␊
-      let targetIndex = -1, bestAbs = Infinity;␊
+    function pressLane(lane) {
+      if (!running) return;
+
+      const tNow = (performance.now() - startTime) / 1000;
+      let targetIndex = -1, bestAbs = Infinity;
 
       for (let i = 0; i < chart.length; i++) {
         const n = chart[i];
@@ -594,7 +599,7 @@
         }
       }
 
-     if (targetIndex >= 0) {
+      if (targetIndex >= 0) {
         const n = chart[targetIndex];
         const dtMs = (tNow - n.t) * 1000;
         judge(dtMs);
@@ -608,7 +613,7 @@
         flashKeyByLane(lane);
       }
     }
-    
+
     /* ====== 倒數 ====== */
     function showCountdown(callback) {
       const countdownText = document.getElementById('countdownText');
@@ -739,6 +744,7 @@
   </script>
 </body>
 </html>
+
 
 
 
