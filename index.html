@@ -200,6 +200,7 @@
     const JUDGE_WINDOW_MS = 200;
     const MISS_Y_OFFSET = 40;
     const TOUCH_WINDOW_MS = 200;
+    const LATE_MISS_GRACE_MS = 120;
 
     // 統計
     let missCount = 0;
@@ -391,13 +392,18 @@
       }
     }
 
-    function isMiss(n) {
+    function isMiss(n, currentTimeSec) {
       const dir = currentDirection;
       const judgeLineY = getJudgeLineY();
+      const dtMs = (currentTimeSec - n.t) * 1000;
+      const beyondLineDown = n.y > judgeLineY + MISS_Y_OFFSET;
+      const beyondLineUp = n.y < judgeLineY - MISS_Y_OFFSET;
+      const graceOver = dtMs > LATE_MISS_GRACE_MS;
+
       if (dir === 'down') {
-        return n.y > judgeLineY + MISS_Y_OFFSET; // 掉過線
+        return beyondLineDown && graceOver; // 掉過線且超過寬限時間
       } else {
-        return n.y < judgeLineY - MISS_Y_OFFSET; // 升過線
+        return beyondLineUp && graceOver; // 升過線且超過寬限時間
       }
     }
 
@@ -420,12 +426,12 @@
     function update(t) {
       chart.forEach(n => { n.y = noteYAtTime(n, t); });
 
-      chart.forEach(n => {
-        if (n.hit) return;
-        if (isMiss(n)) {
-          n.hit = true;
-          miss();
-        }
+      chart.forEach(n => {␊
+        if (n.hit) return;␊
+        if (isMiss(n, t)) {
+          n.hit = true;␊
+          miss();␊
+        }␊
       });
     }
 
@@ -708,6 +714,7 @@
   </script>
 </body>
 </html>
+
 
 
 
