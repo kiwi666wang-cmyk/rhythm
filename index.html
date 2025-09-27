@@ -13,17 +13,34 @@
       text-align: center; transition: background 0.5s ease;
     }
     body.ex-mode { background: linear-gradient(to bottom, #ff3300, #990000, #000000); }
-    canvas {
-      display: block; margin: 20px auto; background: #1f2340; border: 2px solid #fff;
-      width: 95%; max-width: 420px; height: auto; touch-action: manipulation;
+
+    /* 舞台容器：維持你原本的 95% / 420px 尺寸，不改大小 */
+    #stage {
+      position: relative;
+      width: 95%;
+      max-width: 420px;
+      margin: 20px auto;
     }
+
+    /* canvas 吃容器寬度；外觀大小仍與你原本一致 */
+    canvas {
+      display: block;
+      background: #1f2340;
+      border: 2px solid #fff;
+      width: 100%;
+      height: auto;
+      touch-action: manipulation;
+    }
+
+    /* hitbar 相對 #stage 絕對定位，不再用 left:50% */
     .hitbar {
       display: flex; justify-content: space-between; align-items: center;
-      width: 95%; max-width: 420px; height: 90px;
-      position: absolute; left: 50%; transform: translateX(-50%);
+      height: 90px;
+      position: absolute; left: 0; width: 100%;
       z-index: 2;
     }
-   .hitkey {
+
+    .hitkey {
       flex: 1; margin: 0 5px; height: 90px; border: 3px solid transparent; border-radius: 50%;
       box-sizing: border-box;
       background: rgba(255,255,255,.05); font-size: 36px; font-weight: bold;
@@ -117,13 +134,17 @@
   <!-- 遊戲畫面 -->
   <div id="gameScreen" style="display:none; position:relative;">
     <button id="pauseButton" onclick="pauseGame()">⏸️</button>
-    <canvas id="gameCanvas" width="420" height="640"></canvas>
 
-    <div class="hitbar">
-      <div class="hitkey" id="key-d">←</div>
-      <div class="hitkey" id="key-f">↓</div>
-      <div class="hitkey" id="key-j">↑</div>
-      <div class="hitkey" id="key-k">→</div>
+    <!-- 舞台容器：包住 canvas 與 hitbar（大小不變） -->
+    <div id="stage">
+      <canvas id="gameCanvas" width="420" height="640"></canvas>
+
+      <div class="hitbar">
+        <div class="hitkey" id="key-d">←</div>
+        <div class="hitkey" id="key-f">↓</div>
+        <div class="hitkey" id="key-j">↑</div>
+        <div class="hitkey" id="key-k">→</div>
+      </div>
     </div>
 
     <div class="hud">
@@ -171,17 +192,29 @@
     /* ========= 參數 ========= */
     const canvas = document.getElementById('gameCanvas');
     const ctx = canvas.getContext('2d');
+
+    // 內部遊戲座標（固定 420x640，不動）
     const W = canvas.width, H = canvas.height;
-    const laneWidth = W / 4;
-    const hitkeyHeight = 90;
+    const laneWidth = W / 4;  // 內部單位寬
+    const hitkeyHeight = 90;  // CSS px 高度（按鍵圈）
+
     const hitbar = document.querySelector('.hitbar');
 
-    // 打擊線位置依方向切換
-    const getJudgeLineY = () => {
-      const dirSelect = document.getElementById('noteDirection');
-      const dir = currentDirection || (dirSelect ? dirSelect.value : 'down');
-      return (dir === 'up') ? (hitkeyHeight / 2) : (H - hitkeyHeight / 2);
-    };
+    // —— 幾何工具：把內部座標 ↔ CSS 像素對上 —— //
+    function getCanvasRect() { return canvas.getBoundingClientRect(); }
+    function getScaleY() { return getCanvasRect().height / H; }         // CSS px / 內部 px
+    function getScaleX() { return getCanvasRect().width / W; }
+
+    // 以 CSS 像素算的判定線（給 hitbar 對齊）
+    function getJudgeLineYCss() {
+      const dir = currentDirection || 'down';
+      const rectH = getCanvasRect().height;
+      return (dir === 'up') ? (hitkeyHeight / 2) : (rectH - hitkeyHeight / 2);
+    }
+    // 以內部座標算的判定線（給遊戲邏輯 / 繪圖）
+    function getJudgeLineYInternal() {
+      return getJudgeLineYCss() / getScaleY();
+    }
 
     const keys = ['d','f','j','k'];
 
@@ -193,12 +226,12 @@
     const hitSound = document.getElementById('hitSound');
     const bgm = document.getElementById('bgm');
 
-    let baseNoteSpeed = 550;
+    let baseNoteSpeed = 550;   // 內部 px / s
     let noteSpeed = baseNoteSpeed;
 
-    const FNF_WINDOWS = { sick: 70, good: 118, bad: 123, shit: 138 };
+    const FNF_WINDOWS = { sick: 70, good: 118, bad: 123, shit: 138 }; // ms
     const FNF_SCORES  = { sick: 350, good: 200, bad: 100, shit: -50, miss: -300, ghost: -150 };
-    const MISS_Y_OFFSET = 40;
+    const MISS_Y_OFFSET = 40;   // 內部 px
     const TOUCH_WINDOW_MS = FNF_WINDOWS.shit;
     const LATE_MISS_GRACE_MS = 120;
 
@@ -231,7 +264,7 @@
       "【AKASAKI】Bunny Girl _ バニーガール（Lyric Video） - AKASAKI (19).mp3",
       "【MV】隙_ゆーり【オリジナル】 - ゆーり🍎🐥〔24〕・yuri (1).mp3",
       "【imase】NIGHT DANCER（MV） - imase.mp3",
-      "【オリジナル楽曲】粛聖!! ロリ神レクイエム☆ _ しぐれうい（9さい）【IOSYS（まろん&D.watt）】 - しぐれうい.mp3",
+      "【オリジナル樂曲】粛聖!! ロリ神レクイエム☆ _ しぐれうい（9さい）【IOSYS（まろん&D.watt）】 - しぐれうい.mp3",
       "なとり - Overdose - なとり _ natori.mp3",
       "ロクデナシ「ただ声一つ」_ Rokudenashi - One Voice【Official Music Video】 - ロクデナシ _ Rokudenashi.mp3",
       "好きだから。_ 『ユイカ』【MV】 - 『ユイカ』.mp3",
@@ -301,8 +334,6 @@
         comboFlash = `COMBO x${combo}!!`;
         setTimeout(() => comboFlash = '', 800);
       }
-
-      return;
     }
 
     function miss() {
@@ -312,8 +343,6 @@
       stats.miss++;
       score = Math.max(0, score + FNF_SCORES.miss);
       updateHUD();
-
-      // EX：15 次 MISS 直接失敗
       if (currentDifficulty === 'ex' && missCount > 15) {
         triggerFailOnce('你輸了！EX 模式 MISS 超過 15 次');
       }
@@ -340,7 +369,6 @@
       chart = [];
       const difficulty = currentDifficulty;
 
-      // 隨機參數
       let time = 1;
       let doubleNoteChance = 0.35;
       let timeGapMin = 0.20;
@@ -355,7 +383,7 @@
       } else if (difficulty === 'hard') {
         doubleNoteChance = 0.55; timeGapMin = 0.15; timeGapMax = 0.35;
       } else if (difficulty === 'hell') {
-        doubleNoteChance = 0.75; timeGapMin = 0.10; timeGapMax = 0.25; // ≥75%雙鍵
+        doubleNoteChance = 0.75; timeGapMin = 0.10; timeGapMax = 0.25;
       } else if (difficulty === 'ex') {
         doubleNoteChance = 0.60; timeGapMin = 0.12; timeGapMax = 0.30;
       }
@@ -378,8 +406,7 @@
         return;
       }
 
-      // EX / HELL：更密集
-      const beat = 0.5; // 2 beats/sec
+      const beat = 0.5;
       let t = 1;
       let laneCursor = 0;
       const nextLane = () => { laneCursor = (laneCursor + 1) % 4; return laneCursor; };
@@ -398,7 +425,7 @@
           t += Math.random() < 0.5 ? beat / 2 : beat;
         } else {
           pushNote(t, nextLane());
-          if (Math.random() < 0.85) pushNote(t, (laneCursor + 2) % 4); // ≥75%雙鍵
+          if (Math.random() < 0.85) pushNote(t, (laneCursor + 2) % 4);
           pushNote(t + beat / 2, (laneCursor + 1) % 4);
           if (Math.random() < 0.4) {
             pushNote(t + beat / 4, randLane());
@@ -412,69 +439,47 @@
     /* ====== 位置計算（支援上下兩種方向） ====== */
     function noteYAtTime(n, t) {
       const dir = currentDirection;
-      const judgeLineY = getJudgeLineY();
+      const judgeLineY = getJudgeLineYInternal(); // 內部座標
       if (dir === 'down') {
-        // 往下掉：t<n.t 時在上方；到 n.t 逼近打擊線
         return judgeLineY - (n.t - t) * noteSpeed;
       } else {
-        // 往上升：t<n.t 時在下方；到 n.t 逼近打擊線（線在頂）
         return judgeLineY + (n.t - t) * noteSpeed;
       }
     }
 
     function isMiss(n, currentTimeSec) {
       const dir = currentDirection;
-      const judgeLineY = getJudgeLineY();
+      const judgeLineY = getJudgeLineYInternal(); // 內部座標
       const dtMs = (currentTimeSec - n.t) * 1000;
       const beyondLineDown = n.y > judgeLineY + MISS_Y_OFFSET;
       const beyondLineUp = n.y < judgeLineY - MISS_Y_OFFSET;
       const graceOver = dtMs > LATE_MISS_GRACE_MS;
-
-      if (dir === 'down') {
-        return beyondLineDown && graceOver; // 掉過線且超過寬限時間
-      } else {
-        return beyondLineUp && graceOver; // 升過線且超過寬限時間
-      }
+      return (dir === 'down') ? (beyondLineDown && graceOver) : (beyondLineUp && graceOver);
     }
 
     /* ====== 更新 & 繪圖 ====== */
     function updateHitbarPosition() {
-      if (!hitbar) return;
-      const gameScreen = document.getElementById('gameScreen');
-      if (!gameScreen || gameScreen.style.display === 'none') return;
-
-      const canvasRect = canvas.getBoundingClientRect();
-      const screenRect = gameScreen.getBoundingClientRect();
-      const relativeCanvasTop = canvasRect.top - screenRect.top;
-      const judgeLineY = getJudgeLineY();
-      const hitbarTop = relativeCanvasTop + judgeLineY - hitkeyHeight / 2;
-
-      hitbar.style.top = `${hitbarTop}px`;
-      hitbar.style.bottom = 'auto';
+      if (!hitbar || document.getElementById('gameScreen').style.display === 'none') return;
+      const hitbarTopCss = getJudgeLineYCss() - hitkeyHeight / 2;
+      hitbar.style.top = `${hitbarTopCss}px`;
     }
 
     function update(t) {
       chart.forEach(n => { n.y = noteYAtTime(n, t); });
-
       chart.forEach(n => {
-
         if (n.hit) return;
-
         if (isMiss(n, t)) {
           n.hit = true;
-
           miss();
-
         }
-
       });
     }
 
     function render() {
-      const judgeLineY = getJudgeLineY();
-
+      const judgeLineY = getJudgeLineYInternal(); // 內部座標
       ctx.clearRect(0, 0, W, H);
-        const laneColors = ['#b266ff', '#66ccff', '#66ff66', '#ff6666'];
+
+      const laneColors = ['#b266ff', '#66ccff', '#66ff66', '#ff6666'];
       chart.forEach(n => {
         if (n.hit) return;
         const x = n.lane * laneWidth + laneWidth / 2;
@@ -484,11 +489,11 @@
         ctx.fill();
       });
 
-        if (lastJudgementText !== '-') {
+      if (lastJudgementText !== '-') {
         ctx.fillStyle = '#fff';
         ctx.font = 'bold 32px sans-serif';
         ctx.textAlign = 'center';
-        const judgementYOffset = (currentDirection === 'up') ? 120 : -40;
+        const judgementYOffset = (currentDirection === 'up') ? 120 : -40; // 內部座標偏移
         ctx.fillText(lastJudgementText, W / 2, judgeLineY + judgementYOffset);
       }
 
@@ -497,22 +502,6 @@
         ctx.font = 'bold 36px sans-serif';
         ctx.textAlign = 'center';
         ctx.fillText(comboFlash, W / 2, H / 2 - 100);
-      }
-
-      if (!running && chart.every(n => n.hit)) {
-        document.getElementById('finalSong').textContent = currentSongTitle;
-        document.getElementById('finalDiff').textContent = currentDifficulty.toUpperCase();
-        document.getElementById('finalDir').textContent  = (currentDirection === 'up' ? '上升' : '下落');
-        document.getElementById('finalJudge').textContent= (currentJudgeMode === 'old' ? 'Old' : 'New');
-        document.getElementById('finalScore').textContent = score;
-        document.getElementById('statSick').textContent = stats.sick;
-        document.getElementById('statGood').textContent = stats.good;
-        document.getElementById('statBad').textContent = stats.bad;
-        document.getElementById('statShit').textContent = stats.shit;
-        document.getElementById('statMiss').textContent = stats.miss;
-
-        document.getElementById('gameScreen').style.display = 'none';
-        document.getElementById('endScreen').style.display = 'block';
       }
     }
 
@@ -554,26 +543,18 @@
       if (e.key === 'Escape') { paused ? resumeGame() : pauseGame(); }
     });
 
-     ['d','f','j','k'].forEach((k, idx) => {
+    ['d','f','j','k'].forEach((k, idx) => {
       const el = document.getElementById('key-' + k);
       el.addEventListener('pointerdown', (e) => { e.preventDefault(); pressLane(idx); }, { passive: false });
     });
 
-    window.addEventListener('resize', updateHitbarPosition);
-
-    const noteDirectionSelect = document.getElementById('noteDirection');
-    if (noteDirectionSelect) {
-      noteDirectionSelect.addEventListener('change', (e) => {
-        currentDirection = e.target.value;
-        updateHitbarPosition();
-      });
-    }
-
+    // 以 CSS 寬度判 lane，避免 CSS 縮放下的誤判
     canvas.addEventListener('pointerdown', (e) => {
       e.preventDefault();
-      const rect = canvas.getBoundingClientRect();
+      const rect = getCanvasRect();
       const x = e.clientX - rect.left;
-      const lane = Math.min(3, Math.max(0, Math.floor(x / laneWidth)));
+      const cssLaneWidth = rect.width / 4;
+      const lane = Math.min(3, Math.max(0, Math.floor(x / cssLaneWidth)));
       pressLane(lane);
     }, { passive: false });
 
@@ -600,12 +581,23 @@
         n.hit = true;
         flashKeyByLane(lane);
       } else {
-        // Ghost tap penalty 模擬 FNF 未命中時的懲罰
-        if (currentJudgeMode === 'old') {
-          ghostTap();
-        }
+        if (currentJudgeMode === 'old') ghostTap();
         flashKeyByLane(lane);
       }
+    }
+
+    /* ====== 版面變化監聽（行動端重點） ====== */
+    window.addEventListener('resize', updateHitbarPosition, { passive: true });
+    window.addEventListener('scroll', updateHitbarPosition, { passive: true });
+    if (window.visualViewport) {
+      ['resize','scroll'].forEach(ev => {
+        window.visualViewport.addEventListener(ev, updateHitbarPosition, { passive: true });
+      });
+    }
+    const stageEl = document.getElementById('stage');
+    if (window.ResizeObserver && stageEl) {
+      const ro = new ResizeObserver(() => updateHitbarPosition());
+      ro.observe(stageEl);
     }
 
     /* ====== 倒數 ====== */
@@ -626,7 +618,6 @@
 
     /* ====== 流程 ====== */
     function startGame() {
-      // 設定與 HUD
       const difficulty = document.getElementById('difficultySelect').value;
       const speedMultiplierSelect = document.getElementById('speedMultiplier');
       const dir = document.getElementById('noteDirection').value;
@@ -643,9 +634,8 @@
 
       document.body.classList.toggle('ex-mode', difficulty === 'ex');
 
-      // 重置狀態
       try { bgm.pause(); } catch {}
-      cancelAnimationFrame(loopId);
+      try { cancelAnimationFrame(loopId); } catch {}
       score = 0; combo = 0; lastJudgementText = '-'; comboFlash = '';
       chart = []; paused = false; running = true; missCount = 0; gameOver = false;
       stats = { sick:0, good:0, bad:0, shit:0, miss:0 };
@@ -662,17 +652,22 @@
       // 畫面切換
       document.getElementById('menuScreen').style.display = 'none';
       document.getElementById('optionsScreen').style.display = 'none';
-       document.getElementById('endScreen').style.display = 'none';
+      document.getElementById('endScreen').style.display = 'none';
       document.getElementById('pauseScreen').style.display = 'none';
       document.getElementById('gameScreen').style.display = 'block';
       document.getElementById('gameScreen').classList.remove('blur');
+
+      // 連續校正（避免初次顯示時 layout 重排）
       updateHitbarPosition();
+      requestAnimationFrame(updateHitbarPosition);
+      setTimeout(updateHitbarPosition, 0);
+      setTimeout(updateHitbarPosition, 50);
+
       updateHUD();
 
-      // 先用安全預設 120 秒生成，metadata 到時再「覆蓋重產」
+      // 先用安全預設 120 秒生成，metadata 到時再覆蓋
       let chartFinalized = false;
       generateChart(120);
-
       bgm.onloadedmetadata = () => {
         if (chartFinalized) return;
         const durationSec = (!isNaN(bgm.duration) && bgm.duration > 0) ? bgm.duration : 120;
@@ -680,7 +675,7 @@
         chartFinalized = true;
       };
 
-      // 倒數後立即開始（降低等待）
+      // 倒數後開始
       showCountdown(() => {
         startTime = performance.now();
         bgm.currentTime = 0;
@@ -693,7 +688,7 @@
       if (!running || paused) return;
       paused = true;
       try { bgm.pause(); } catch {}
-      cancelAnimationFrame(loopId);
+      try { cancelAnimationFrame(loopId); } catch {}
       elapsedTimeBeforePause = (performance.now() - startTime) / 1000;
       document.getElementById('gameScreen').classList.add('blur');
       document.getElementById('gameScreen').style.display = 'none';
@@ -703,10 +698,13 @@
     function resumeGame() {
       if (!paused) return;
       paused = false;
-       document.getElementById('pauseScreen').style.display = 'none';
+      document.getElementById('pauseScreen').style.display = 'none';
       document.getElementById('gameScreen').style.display = 'block';
       document.getElementById('gameScreen').classList.remove('blur');
+
+      // 回來再校正一次
       updateHitbarPosition();
+      requestAnimationFrame(updateHitbarPosition);
 
       showCountdown(() => {
         startTime = performance.now() - (elapsedTimeBeforePause * 1000);
@@ -738,20 +736,6 @@
   </script>
 </body>
 </html>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
