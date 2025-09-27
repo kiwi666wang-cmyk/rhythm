@@ -14,7 +14,7 @@
     }
     body.ex-mode { background: linear-gradient(to bottom, #ff3300, #990000, #000000); }
 
-    /* 舞台容器：維持你原本的 95% / 420px 尺寸，不改大小 */
+    /* 舞台容器（大小沿用你原本的 95% / 420px，不壓縮） */
     #stage {
       position: relative;
       width: 95%;
@@ -22,7 +22,7 @@
       margin: 20px auto;
     }
 
-    /* canvas 吃容器寬度；外觀大小仍與你原本一致 */
+    /* canvas 跟著容器寬 */
     canvas {
       display: block;
       background: #1f2340;
@@ -32,7 +32,7 @@
       touch-action: manipulation;
     }
 
-    /* hitbar 相對 #stage 絕對定位，不再用 left:50% */
+    /* hitbar 相對 #stage 絕對定位 */
     .hitbar {
       display: flex; justify-content: space-between; align-items: center;
       height: 90px;
@@ -56,7 +56,7 @@
     button {
       margin:10px; padding:10px 20px; font-size:18px; background:#78d5ff; border:none; border-radius:8px; cursor:pointer;
     }
-    #menuScreen, #endScreen, #optionsScreen, #pauseScreen { padding-top: 120px; }
+    #menuScreen, #musicScreen, #endScreen, #optionsScreen, #pauseScreen { padding-top: 120px; }
     .blur { filter: blur(6px); pointer-events: none; user-select: none; }
     #pauseButton { position: absolute; top: 10px; right: 10px; z-index: 3; }
     .countdown {
@@ -72,6 +72,10 @@
     .row { margin: 10px 0; }
     label { margin-right: 6px; }
     select { padding: 6px 10px; border-radius: 6px; border: 1px solid #445; background:#12152a; color:#fff; }
+
+    /* 音樂選單樣式（大拇指好點） */
+    #songSelect { width: 90%; max-width: 420px; height: 280px; }
+    #musicScreen .hint { opacity: .8; font-size: 14px; margin-top: 6px; }
   </style>
 </head>
 <body>
@@ -79,7 +83,25 @@
   <div id="menuScreen">
     <h1>🎵 DFJK 節奏遊戲</h1>
     <button onclick="startGame()">開始遊戲</button>
+    <button onclick="showMusic()">音樂</button>
     <button onclick="showOptions()">選項</button>
+  </div>
+
+  <!-- 音樂選單（新） -->
+  <div id="musicScreen" style="display:none;">
+    <h2>🎼 選擇本局曲目</h2>
+    <div class="row">
+      <!-- 用 size 多選框當清單，但實際上單選 -->
+      <select id="songSelect" size="10"></select>
+      <div class="hint">點擊上方清單選擇。未選擇前無法開始遊戲。</div>
+    </div>
+    <div class="row">
+      <button onclick="confirmSong()">確定</button>
+      <button onclick="goToMenu()">回主選單</button>
+    </div>
+    <div class="row">
+      已選：<span id="chosenSongLabel">尚未選擇</span>
+    </div>
   </div>
 
   <!-- 選項 -->
@@ -135,7 +157,6 @@
   <div id="gameScreen" style="display:none; position:relative;">
     <button id="pauseButton" onclick="pauseGame()">⏸️</button>
 
-    <!-- 舞台容器：包住 canvas 與 hitbar（大小不變） -->
     <div id="stage">
       <canvas id="gameCanvas" width="420" height="640"></canvas>
 
@@ -193,25 +214,21 @@
     const canvas = document.getElementById('gameCanvas');
     const ctx = canvas.getContext('2d');
 
-    // 內部遊戲座標（固定 420x640，不動）
+    // 內部遊戲座標（固定 420x640）
     const W = canvas.width, H = canvas.height;
-    const laneWidth = W / 4;  // 內部單位寬
-    const hitkeyHeight = 90;  // CSS px 高度（按鍵圈）
-
+    const laneWidth = W / 4;
+    const hitkeyHeight = 90;
     const hitbar = document.querySelector('.hitbar');
 
-    // —— 幾何工具：把內部座標 ↔ CSS 像素對上 —— //
-    function getCanvasRect() { return canvas.getBoundingClientRect(); }
-    function getScaleY() { return getCanvasRect().height / H; }         // CSS px / 內部 px
-    function getScaleX() { return getCanvasRect().width / W; }
+    // —— CSS 與內部座標對齊 —— //
+    function getCanvasRect(){ return canvas.getBoundingClientRect(); }
+    function getScaleY(){ return getCanvasRect().height / H; }
 
-    // 以 CSS 像素算的判定線（給 hitbar 對齊）
     function getJudgeLineYCss() {
       const dir = currentDirection || 'down';
       const rectH = getCanvasRect().height;
       return (dir === 'up') ? (hitkeyHeight / 2) : (rectH - hitkeyHeight / 2);
     }
-    // 以內部座標算的判定線（給遊戲邏輯 / 繪圖）
     function getJudgeLineYInternal() {
       return getJudgeLineYCss() / getScaleY();
     }
@@ -226,12 +243,12 @@
     const hitSound = document.getElementById('hitSound');
     const bgm = document.getElementById('bgm');
 
-    let baseNoteSpeed = 550;   // 內部 px / s
+    let baseNoteSpeed = 550;
     let noteSpeed = baseNoteSpeed;
 
-    const FNF_WINDOWS = { sick: 70, good: 118, bad: 123, shit: 138 }; // ms
+    const FNF_WINDOWS = { sick: 70, good: 118, bad: 123, shit: 138 };
     const FNF_SCORES  = { sick: 350, good: 200, bad: 100, shit: -50, miss: -300, ghost: -150 };
-    const MISS_Y_OFFSET = 40;   // 內部 px
+    const MISS_Y_OFFSET = 40;
     const TOUCH_WINDOW_MS = FNF_WINDOWS.shit;
     const LATE_MISS_GRACE_MS = 120;
 
@@ -245,6 +262,9 @@
     let currentDifficulty = '-';
     let currentDirection = 'down';
     let currentJudgeMode = 'old';
+
+    // ★ 使用者選擇的歌曲（必填）
+    let selectedSongFile = null;
 
     // 曲庫（請確保 /music 內檔名一致）
     const SONGS = [
@@ -328,8 +348,7 @@
       lastJudgementText = rating;
       updateHUD();
       hitSound.currentTime = 0;
-      hitSound.play();
-
+      hitSound.play().catch(()=>{});
       if (combo > 0 && combo % 10 === 0) {
         comboFlash = `COMBO x${combo}!!`;
         setTimeout(() => comboFlash = '', 800);
@@ -436,23 +455,21 @@
       }
     }
 
-    /* ====== 位置計算（支援上下兩種方向） ====== */
+    /* ====== 位置計算（支援上下） ====== */
     function noteYAtTime(n, t) {
       const dir = currentDirection;
-      const judgeLineY = getJudgeLineYInternal(); // 內部座標
-      if (dir === 'down') {
-        return judgeLineY - (n.t - t) * noteSpeed;
-      } else {
-        return judgeLineY + (n.t - t) * noteSpeed;
-      }
+      const judgeLineY = getJudgeLineYInternal();
+      return (dir === 'down')
+        ? (judgeLineY - (n.t - t) * noteSpeed)
+        : (judgeLineY + (n.t - t) * noteSpeed);
     }
 
     function isMiss(n, currentTimeSec) {
       const dir = currentDirection;
-      const judgeLineY = getJudgeLineYInternal(); // 內部座標
+      const judgeLineY = getJudgeLineYInternal();
       const dtMs = (currentTimeSec - n.t) * 1000;
       const beyondLineDown = n.y > judgeLineY + MISS_Y_OFFSET;
-      const beyondLineUp = n.y < judgeLineY - MISS_Y_OFFSET;
+      const beyondLineUp   = n.y < judgeLineY - MISS_Y_OFFSET;
       const graceOver = dtMs > LATE_MISS_GRACE_MS;
       return (dir === 'down') ? (beyondLineDown && graceOver) : (beyondLineUp && graceOver);
     }
@@ -468,15 +485,12 @@
       chart.forEach(n => { n.y = noteYAtTime(n, t); });
       chart.forEach(n => {
         if (n.hit) return;
-        if (isMiss(n, t)) {
-          n.hit = true;
-          miss();
-        }
+        if (isMiss(n, t)) { n.hit = true; miss(); }
       });
     }
 
     function render() {
-      const judgeLineY = getJudgeLineYInternal(); // 內部座標
+      const judgeLineY = getJudgeLineYInternal();
       ctx.clearRect(0, 0, W, H);
 
       const laneColors = ['#b266ff', '#66ccff', '#66ff66', '#ff6666'];
@@ -493,7 +507,7 @@
         ctx.fillStyle = '#fff';
         ctx.font = 'bold 32px sans-serif';
         ctx.textAlign = 'center';
-        const judgementYOffset = (currentDirection === 'up') ? 120 : -40; // 內部座標偏移
+        const judgementYOffset = (currentDirection === 'up') ? 120 : -40;
         ctx.fillText(lastJudgementText, W / 2, judgeLineY + judgementYOffset);
       }
 
@@ -535,6 +549,46 @@
       loopId = requestAnimationFrame(loop);
     }
 
+    /* ====== 音樂選單：邏輯 ====== */
+    function showMusic() {
+      // 進選單前先填入所有歌曲
+      const sel = document.getElementById('songSelect');
+      if (!sel.dataset.filled) {
+        // 先清空
+        sel.innerHTML = '';
+        SONGS.forEach((f, idx) => {
+          const opt = document.createElement('option');
+          opt.value = f;
+          opt.textContent = f.replace(/\.mp3$/i,'');
+          sel.appendChild(opt);
+        });
+        sel.dataset.filled = '1';
+        // 綁定選擇變更
+        sel.addEventListener('change', () => {
+          selectedSongFile = sel.value || null;
+          document.getElementById('chosenSongLabel').textContent =
+            selectedSongFile ? selectedSongFile.replace(/\.mp3$/i,'') : '尚未選擇';
+        });
+      }
+      document.getElementById('menuScreen').style.display = 'none';
+      document.getElementById('optionsScreen').style.display = 'none';
+      document.getElementById('endScreen').style.display = 'none';
+      document.getElementById('pauseScreen').style.display = 'none';
+      document.getElementById('musicScreen').style.display = 'block';
+    }
+
+    function confirmSong() {
+      const sel = document.getElementById('songSelect');
+      if (!sel.value) {
+        alert('請先選擇音樂');
+        return;
+      }
+      selectedSongFile = sel.value;
+      document.getElementById('chosenSongLabel').textContent = sel.options[sel.selectedIndex].textContent;
+      // 回主畫面
+      goToMenu();
+    }
+
     /* ====== 輸入 ====== */
     window.addEventListener('keydown', e => {
       const k = e.key.toLowerCase();
@@ -548,7 +602,7 @@
       el.addEventListener('pointerdown', (e) => { e.preventDefault(); pressLane(idx); }, { passive: false });
     });
 
-    // 以 CSS 寬度判 lane，避免 CSS 縮放下的誤判
+    // 以 CSS 寬度判 lane，避免 CSS 縮放誤差
     canvas.addEventListener('pointerdown', (e) => {
       e.preventDefault();
       const rect = getCanvasRect();
@@ -586,7 +640,7 @@
       }
     }
 
-    /* ====== 版面變化監聽（行動端重點） ====== */
+    /* ====== 行動端版面監聽 ====== */
     window.addEventListener('resize', updateHitbarPosition, { passive: true });
     window.addEventListener('scroll', updateHitbarPosition, { passive: true });
     if (window.visualViewport) {
@@ -618,6 +672,13 @@
 
     /* ====== 流程 ====== */
     function startGame() {
+      // ★ 沒選歌就禁止開始
+      if (!selectedSongFile) {
+        alert('請先選擇音樂');
+        showMusic();
+        return;
+      }
+
       const difficulty = document.getElementById('difficultySelect').value;
       const speedMultiplierSelect = document.getElementById('speedMultiplier');
       const dir = document.getElementById('noteDirection').value;
@@ -640,24 +701,23 @@
       chart = []; paused = false; running = true; missCount = 0; gameOver = false;
       stats = { sick:0, good:0, bad:0, shit:0, miss:0 };
       elapsedTimeBeforePause = 0;
-      updateHUD();
 
-      // 隨機選歌
-      const pick = SONGS[Math.floor(Math.random() * SONGS.length)];
-      currentSongTitle = pick.replace(/\.mp3$/i, '');
-      const url = 'music/' + encodeURIComponent(pick);
+      // ★ 設定為玩家選擇的曲目（完全移除隨機機制）
+      currentSongTitle = selectedSongFile.replace(/\.mp3$/i, '');
+      const url = 'music/' + encodeURIComponent(selectedSongFile);
       bgm.src = url;
       bgm.load();
 
       // 畫面切換
       document.getElementById('menuScreen').style.display = 'none';
+      document.getElementById('musicScreen').style.display = 'none';
       document.getElementById('optionsScreen').style.display = 'none';
       document.getElementById('endScreen').style.display = 'none';
       document.getElementById('pauseScreen').style.display = 'none';
       document.getElementById('gameScreen').style.display = 'block';
       document.getElementById('gameScreen').classList.remove('blur');
 
-      // 連續校正（避免初次顯示時 layout 重排）
+      // 對齊
       updateHitbarPosition();
       requestAnimationFrame(updateHitbarPosition);
       setTimeout(updateHitbarPosition, 0);
@@ -702,7 +762,6 @@
       document.getElementById('gameScreen').style.display = 'block';
       document.getElementById('gameScreen').classList.remove('blur');
 
-      // 回來再校正一次
       updateHitbarPosition();
       requestAnimationFrame(updateHitbarPosition);
 
@@ -716,12 +775,14 @@
     function goToMenu() {
       document.getElementById('endScreen').style.display = 'none';
       document.getElementById('gameScreen').style.display = 'none';
+      document.getElementById('musicScreen').style.display = 'none';
       document.getElementById('optionsScreen').style.display = 'none';
       document.getElementById('pauseScreen').style.display = 'none';
       document.getElementById('menuScreen').style.display = 'block';
       document.getElementById('gameScreen').classList.remove('blur');
       document.body.classList.remove('ex-mode');
       try { bgm.pause(); } catch {}
+      updateHUD();
     }
 
     function showOptions() {
@@ -736,7 +797,6 @@
   </script>
 </body>
 </html>
-
 
 
 
