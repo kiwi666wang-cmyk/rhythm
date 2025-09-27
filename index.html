@@ -474,13 +474,7 @@
       const judgeLineY = getJudgeLineY();
 
       ctx.clearRect(0, 0, W, H);
-      ctx.strokeStyle = '#fff';
-      ctx.beginPath();
-      ctx.moveTo(0, judgeLineY);
-      ctx.lineTo(W, judgeLineY);
-      ctx.stroke();
-
-      const laneColors = ['#b266ff', '#66ccff', '#66ff66', '#ff6666'];
+        const laneColors = ['#b266ff', '#66ccff', '#66ff66', '#ff6666'];
       chart.forEach(n => {
         if (n.hit) return;
         const x = n.lane * laneWidth + laneWidth / 2;
@@ -744,6 +738,7 @@
   </script>
 </body>
 </html>
+
 
 
 
