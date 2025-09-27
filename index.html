@@ -188,578 +188,486 @@
   <audio id="hitSound" src="https://cdn.pixabay.com/download/audio/2022/03/15/audio_6e3e3b6f3f.mp3?filename=click-124467.mp3"></audio>
   <audio id="bgm"></audio>
 
- <script>
-  /* ========= 參數 ========= */
-  const canvas = document.getElementById('gameCanvas');
-  const ctx = canvas.getContext('2d');
+  <script>
+    /* ========= 參數 ========= */
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
 
-  // 內部遊戲座標（固定 420x640，不動）
-  const W = canvas.width, H = canvas.height;
-  const laneWidth = W / 4;  // 內部單位寬
-  const hitkeyHeight = 90;  // CSS px 高度（按鍵圈）
+    // 內部遊戲座標（固定 420x640，不動）
+    const W = canvas.width, H = canvas.height;
+    const laneWidth = W / 4;  // 內部單位寬
+    const hitkeyHeight = 90;  // CSS px 高度（按鍵圈）
 
-  const hitbar = document.querySelector('.hitbar');
+    const hitbar = document.querySelector('.hitbar');
 
-  // —— 幾何工具：把內部座標 ↔ CSS 像素對上 —— //
-  function getCanvasRect() { return canvas.getBoundingClientRect(); }
-  function getScaleY() { return getCanvasRect().height / H; }         // CSS px / 內部 px
-  function getScaleX() { return getCanvasRect().width / W; }
+    // —— 幾何工具：把內部座標 ↔ CSS 像素對上 —— //
+    function getCanvasRect() { return canvas.getBoundingClientRect(); }
+    function getScaleY() { return getCanvasRect().height / H; }         // CSS px / 內部 px
+    function getScaleX() { return getCanvasRect().width / W; }
 
-  // 以 CSS 像素算的判定線（給 hitbar 對齊）
-  function getJudgeLineYCss() {
-    const dir = currentDirection || 'down';
-    const rectH = getCanvasRect().height;
-    return (dir === 'up') ? (hitkeyHeight / 2) : (rectH - hitkeyHeight / 2);
-  }
-  // 以內部座標算的判定線（給遊戲邏輯 / 繪圖）
-  function getJudgeLineYInternal() {
-    return getJudgeLineYCss() / getScaleY();
-  }
-
-  const keys = ['d','f','j','k'];
-
-  let score = 0, combo = 0, lastJudgementText = '-';
-  let startTime = 0, running = false, paused = false, loopId = null;
-  let chart = [], comboFlash = '';
-  let elapsedTimeBeforePause = 0;
-
-  const hitSound = document.getElementById('hitSound');
-  const bgm = document.getElementById('bgm');
-  bgm.preload = 'auto';
-
-  let baseNoteSpeed = 550;   // 內部 px / s
-  let noteSpeed = baseNoteSpeed;
-
-  const FNF_WINDOWS = { sick: 70, good: 118, bad: 123, shit: 138 }; // ms
-  const FNF_SCORES  = { sick: 350, good: 200, bad: 100, shit: -50, miss: -300, ghost: -150 };
-  const MISS_Y_OFFSET = 40;   // 內部 px
-  const TOUCH_WINDOW_MS = FNF_WINDOWS.shit;
-  const LATE_MISS_GRACE_MS = 120;
-
-  // 統計
-  let missCount = 0;
-  let gameOver = false;
-  let stats = { sick:0, good:0, bad:0, shit:0, miss:0 };
-
-  // 當前資訊
-  let currentSongTitle = '-';
-  let currentDifficulty = '-';
-  let currentDirection = 'down';
-  let currentJudgeMode = 'old';
-
-  // 曲庫（請確保 /music 內檔名一致）
-  const SONGS = [
-    "Charlie Puth - Light Switch [Official Music Video] - Charlie Puth.mp3",
-    "Creepy Nuts - オトノケ(Otonoke) 【Official MV】 [Dandandan OP] - Creepy Nuts.mp3",
-    "Creepy Nuts ”Mirage” × Anime ”Call of the Night” Collaboration Music Video Opening Theme Song - Creepy Nuts.mp3",
-    "Creepy Nuts ”Nemure” × Anime ”Call of the Night” Collaboration Music Video Ending Theme Song - Creepy Nuts (1).mp3",
-    "Creepy Nuts｢Bling-Bang-Bang-Born｣ × TV Anime｢マッシュル-MASHLE-｣ Collaboration Music Video #BBBBダンス - Creepy Nuts.mp3",
-    "KANA-BOON - Silhouette - KANABOONVEVO.mp3",
-    "Lost Sky - Fearless pt.II (feat. Chris Linton) Trap NCS - Copyright Free Music - NoCopyrightSounds.mp3",
-    "Lost Sky - Vision pt. II (feat. She Is Jules) Future Trap NCS - Copyright Free Music - NoCopyrightSounds.mp3",
-    "Lost Sky - Where We Started (feat. Jex) Melodic Dubstep NCS - Copyright Free Music - NoCopyrightSounds.mp3",
-    "Lost Sky, Sara Skinner - Dreams pt. II (feat. Sara Skinner) [NCS Release].mp3",
-    "OneRepublic - Nobody (from Kaiju No. 8) [Official Music Video] - OneRepublicVEVO.mp3",
-    "YOASOBI「Watch me!」Official Music Video - Ayase _ YOASOBI.mp3",
-    "yung kai - blue (official music video) - yung kai.mp3",
-    "【AKASAKI】Bunny Girl _ バニーガール（Lyric Video） - AKASAKI (19).mp3",
-    "【MV】隙_ゆーり【オリジナル】 - ゆーり🍎🐥〔24〕・yuri (1).mp3",
-    "【imase】NIGHT DANCER（MV） - imase.mp3",
-    "【オリジナル樂曲】粛聖!! ロリ神レクイエム☆ _ しぐれうい（9さい）【IOSYS（まろん&D.watt）】 - しぐれうい.mp3",
-    "なとり - Overdose - なとり _ natori.mp3",
-    "ロクデナシ「ただ声一つ」_ Rokudenashi - One Voice【Official Music Video】 - ロクデナシ _ Rokudenashi.mp3",
-    "好きだから。_ 『ユイカ』【MV】 - 『ユイカ』.mp3",
-    "廻廻奇譚 - Eve MV - Eve.mp3",
-    "青のすみか _ キタニタツヤ - Where Our Blue Is _ Tatsuya Kitani - キタニタツヤ _ Tatsuya Kitani.mp3"
-  ];
-
-  /* ====== HUD ====== */
-  function updateHUD() {
-    document.getElementById('score').textContent = score;
-    document.getElementById('combo').textContent = combo;
-    document.getElementById('judgement').textContent = lastJudgementText;
-    document.getElementById('missCount').textContent = missCount;
-    document.getElementById('songTitle').textContent = currentSongTitle;
-    document.getElementById('diffLabel').textContent = currentDifficulty.toUpperCase();
-    document.getElementById('dirLabel').textContent = (currentDirection === 'up' ? '上升' : '下落');
-    document.getElementById('judgeLabel').textContent = (currentJudgeMode === 'old' ? 'Old' : 'New');
-  }
-
-  /* ====== 視覺：按鍵亮起 ====== */
-  function flashKeyByLane(laneIdx) {
-    const id = ['d','f','j','k'][laneIdx];
-    const el = document.getElementById('key-' + id);
-    if (!el) return;
-    el.classList.add('flash');
-    setTimeout(() => el.classList.remove('flash'), 120);
-  }
-
-  /* ====== 判定 ====== */
-  function judge(dtMs) {
-    const adt = Math.abs(dtMs);
-    let rating = '';
-    let scoreDelta = 0;
-
-    if (adt <= FNF_WINDOWS.sick) {
-      rating = 'SICK!';
-      scoreDelta = FNF_SCORES.sick;
-      stats.sick++;
-      combo += 1;
-    } else if (adt <= FNF_WINDOWS.good) {
-      rating = 'GOOD';
-      scoreDelta = FNF_SCORES.good;
-      stats.good++;
-      combo += 1;
-    } else if (adt <= FNF_WINDOWS.bad) {
-      rating = 'BAD';
-      scoreDelta = FNF_SCORES.bad;
-      stats.bad++;
-      combo += 1;
-    } else if (adt <= FNF_WINDOWS.shit) {
-      rating = 'SHIT';
-      scoreDelta = FNF_SCORES.shit;
-      stats.shit++;
-      combo = Math.max(0, combo - 1);
-    } else {
-      miss();
-      return;
+    // 以 CSS 像素算的判定線（給 hitbar 對齊）
+    function getJudgeLineYCss() {
+      const dir = currentDirection || 'down';
+      const rectH = getCanvasRect().height;
+      return (dir === 'up') ? (hitkeyHeight / 2) : (rectH - hitkeyHeight / 2);
+    }
+    // 以內部座標算的判定線（給遊戲邏輯 / 繪圖）
+    function getJudgeLineYInternal() {
+      return getJudgeLineYCss() / getScaleY();
     }
 
-    score = Math.max(0, score + scoreDelta);
-    lastJudgementText = rating;
-    updateHUD();
-    hitSound.currentTime = 0;
-    hitSound.play().catch(()=>{});
-    if (combo > 0 && combo % 10 === 0) {
-      comboFlash = `COMBO x${combo}!!`;
-      setTimeout(() => comboFlash = '', 800);
-    }
-  }
+    const keys = ['d','f','j','k'];
 
-  function miss() {
-    lastJudgementText = 'MISS';
-    combo = 0;
-    missCount++;
-    stats.miss++;
-    score = Math.max(0, score + FNF_SCORES.miss);
-    updateHUD();
-    if (currentDifficulty === 'ex' && missCount > 15) {
-      triggerFailOnce('你輸了！EX 模式 MISS 超過 15 次');
-    }
-  }
+    let score = 0, combo = 0, lastJudgementText = '-';
+    let startTime = 0, running = false, paused = false, loopId = null;
+    let chart = [], comboFlash = '';
+    let elapsedTimeBeforePause = 0;
 
-  function ghostTap() {
-    lastJudgementText = 'MISS';
-    combo = 0;
-    score = Math.max(0, score + FNF_SCORES.ghost);
-    updateHUD();
-  }
+    const hitSound = document.getElementById('hitSound');
+    const bgm = document.getElementById('bgm');
 
-  function triggerFailOnce(msg) {
-    if (gameOver) return;
-    gameOver = true;
-    running = false;
-    try { cancelAnimationFrame(loopId); } catch {}
-    try { bgm.pause(); } catch {}
-    setTimeout(() => { alert(msg); goToMenu(); }, 0);
-  }
+    let baseNoteSpeed = 550;   // 內部 px / s
+    let noteSpeed = baseNoteSpeed;
 
-  /* ====== 產譜 ====== */
-  function generateChart(durationSec) {
-    chart = [];
-    const difficulty = currentDifficulty;
+    const FNF_WINDOWS = { sick: 70, good: 118, bad: 123, shit: 138 }; // ms
+    const FNF_SCORES  = { sick: 350, good: 200, bad: 100, shit: -50, miss: -300, ghost: -150 };
+    const MISS_Y_OFFSET = 40;   // 內部 px
+    const TOUCH_WINDOW_MS = FNF_WINDOWS.shit;
+    const LATE_MISS_GRACE_MS = 120;
 
-    let time = 1;
-    let doubleNoteChance = 0.35;
-    let timeGapMin = 0.20;
-    let timeGapMax = 0.45;
+    // 統計
+    let missCount = 0;
+    let gameOver = false;
+    let stats = { sick:0, good:0, bad:0, shit:0, miss:0 };
 
-    if (difficulty === 'beginner') {
-      doubleNoteChance = 0.15; timeGapMin = 0.30; timeGapMax = 0.60;
-    } else if (difficulty === 'easy') {
-      doubleNoteChance = 0.20; timeGapMin = 0.25; timeGapMax = 0.50;
-    } else if (difficulty === 'normal') {
-      doubleNoteChance = 0.35; timeGapMin = 0.20; timeGapMax = 0.45;
-    } else if (difficulty === 'hard') {
-      doubleNoteChance = 0.55; timeGapMin = 0.15; timeGapMax = 0.35;
-    } else if (difficulty === 'hell') {
-      doubleNoteChance = 0.75; timeGapMin = 0.10; timeGapMax = 0.25;
-    } else if (difficulty === 'ex') {
-      doubleNoteChance = 0.60; timeGapMin = 0.12; timeGapMax = 0.30;
-    }
+    // 當前資訊
+    let currentSongTitle = '-';
+    let currentDifficulty = '-';
+    let currentDirection = 'down';
+    let currentJudgeMode = 'old';
 
-    if (!(difficulty === 'ex' || difficulty === 'hell')) {
-      while (time < durationSec) {
-        const lanesUsed = new Set();
-        const notesThisFrame = [];
-        const count = Math.random() < doubleNoteChance ? 2 : 1;
-        while (notesThisFrame.length < count) {
-          const lane = Math.floor(Math.random() * 4);
-          if (!lanesUsed.has(lane)) {
-            lanesUsed.add(lane);
-            notesThisFrame.push({ t: time, lane, type: 'tap', hit: false, y: -50 });
-          }
-        }
-        chart.push(...notesThisFrame);
-        time += Math.random() * (timeGapMax - timeGapMin) + timeGapMin;
-      }
-      return;
+    // 曲庫（請確保 /music 內檔名一致）
+    const SONGS = [
+      "Charlie Puth - Light Switch [Official Music Video] - Charlie Puth.mp3",
+      "Creepy Nuts - オトノケ(Otonoke) 【Official MV】 [Dandadan OP] - Creepy Nuts.mp3",
+      "Creepy Nuts ”Mirage” × Anime ”Call of the Night” Collaboration Music Video Opening Theme Song - Creepy Nuts.mp3",
+      "Creepy Nuts ”Nemure” × Anime ”Call of the Night” Collaboration Music Video Ending Theme Song - Creepy Nuts (1).mp3",
+      "Creepy Nuts｢Bling-Bang-Bang-Born｣ × TV Anime｢マッシュル-MASHLE-｣ Collaboration Music Video #BBBBダンス - Creepy Nuts.mp3",
+      "KANA-BOON - Silhouette - KANABOONVEVO.mp3",
+      "Lost Sky - Fearless pt.II (feat. Chris Linton) Trap NCS - Copyright Free Music - NoCopyrightSounds.mp3",
+      "Lost Sky - Vision pt. II (feat. She Is Jules) Future Trap NCS - Copyright Free Music - NoCopyrightSounds.mp3",
+      "Lost Sky - Where We Started (feat. Jex) Melodic Dubstep NCS - Copyright Free Music - NoCopyrightSounds.mp3",
+      "Lost Sky, Sara Skinner - Dreams pt. II (feat. Sara Skinner) [NCS Release].mp3",
+      "OneRepublic - Nobody (from Kaiju No. 8) [Official Music Video] - OneRepublicVEVO.mp3",
+      "YOASOBI「Watch me!」Official Music Video - Ayase _ YOASOBI.mp3",
+      "yung kai - blue (official music video) - yung kai.mp3",
+      "【AKASAKI】Bunny Girl _ バニーガール（Lyric Video） - AKASAKI (19).mp3",
+      "【MV】隙_ゆーり【オリジナル】 - ゆーり🍎🐥〔24〕・yuri (1).mp3",
+      "【imase】NIGHT DANCER（MV） - imase.mp3",
+      "【オリジナル樂曲】粛聖!! ロリ神レクイエム☆ _ しぐれうい（9さい）【IOSYS（まろん&D.watt）】 - しぐれうい.mp3",
+      "なとり - Overdose - なとり _ natori.mp3",
+      "ロクデナシ「ただ声一つ」_ Rokudenashi - One Voice【Official Music Video】 - ロクデナシ _ Rokudenashi.mp3",
+      "好きだから。_ 『ユイカ』【MV】 - 『ユイカ』.mp3",
+      "廻廻奇譚 - Eve MV - Eve.mp3",
+      "青のすみか _ キタニタツヤ - Where Our Blue Is _ Tatsuya Kitani - キタニタツヤ _ Tatsuya Kitani.mp3"
+    ];
+
+    /* ====== HUD ====== */
+    function updateHUD() {
+      document.getElementById('score').textContent = score;
+      document.getElementById('combo').textContent = combo;
+      document.getElementById('judgement').textContent = lastJudgementText;
+      document.getElementById('missCount').textContent = missCount;
+      document.getElementById('songTitle').textContent = currentSongTitle;
+      document.getElementById('diffLabel').textContent = currentDifficulty.toUpperCase();
+      document.getElementById('dirLabel').textContent = (currentDirection === 'up' ? '上升' : '下落');
+      document.getElementById('judgeLabel').textContent = (currentJudgeMode === 'old' ? 'Old' : 'New');
     }
 
-    const beat = 0.5;
-    let t = 1;
-    let laneCursor = 0;
-    const nextLane = () => { laneCursor = (laneCursor + 1) % 4; return laneCursor; };
-    const pushNote = (tt, lane) => chart.push({ t: tt, lane, type: 'tap', hit: false, y: -50 });
-    const randLane = () => Math.floor(Math.random() * 4);
-
-    while (t < durationSec) {
-      if (difficulty === 'ex') {
-        pushNote(t, nextLane());
-        if (Math.random() < 0.60) pushNote(t, (laneCursor + 2) % 4);
-        if (Math.random() < 0.35) pushNote(t + beat / 2, (laneCursor + 1) % 4);
-        if (Math.random() < 0.18) {
-          pushNote(t + beat / 3, randLane());
-          pushNote(t + 2 * beat / 3, randLane());
-        }
-        t += Math.random() < 0.5 ? beat / 2 : beat;
-      } else {
-        pushNote(t, nextLane());
-        if (Math.random() < 0.85) pushNote(t, (laneCursor + 2) % 4);
-        pushNote(t + beat / 2, (laneCursor + 1) % 4);
-        if (Math.random() < 0.4) {
-          pushNote(t + beat / 4, randLane());
-          pushNote(t + 3 * beat / 4, randLane());
-        }
-        t += beat / 2;
-      }
-    }
-  }
-
-  /* ====== 位置計算（支援上下兩種方向） ====== */
-  function noteYAtTime(n, t) {
-    const dir = currentDirection;
-    const judgeLineY = getJudgeLineYInternal(); // 內部座標
-    if (dir === 'down') return judgeLineY - (n.t - t) * noteSpeed;
-    else return judgeLineY + (n.t - t) * noteSpeed;
-  }
-
-  function isMiss(n, currentTimeSec) {
-    const dir = currentDirection;
-    const judgeLineY = getJudgeLineYInternal(); // 內部座標
-    const dtMs = (currentTimeSec - n.t) * 1000;
-    const beyondLineDown = n.y > judgeLineY + MISS_Y_OFFSET;
-    const beyondLineUp = n.y < judgeLineY - MISS_Y_OFFSET;
-    const graceOver = dtMs > LATE_MISS_GRACE_MS;
-    return (dir === 'down') ? (beyondLineDown && graceOver) : (beyondLineUp && graceOver);
-  }
-
-  /* ====== 更新 & 繪圖 ====== */
-  function updateHitbarPosition() {
-    if (!hitbar || document.getElementById('gameScreen').style.display === 'none') return;
-    const hitbarTopCss = getJudgeLineYCss() - hitkeyHeight / 2;
-    hitbar.style.top = `${hitbarTopCss}px`;
-  }
-
-  function update(t) {
-    chart.forEach(n => { n.y = noteYAtTime(n, t); });
-    chart.forEach(n => {
-      if (n.hit) return;
-      if (isMiss(n, t)) { n.hit = true; miss(); }
-    });
-  }
-
-  function render() {
-    const judgeLineY = getJudgeLineYInternal(); // 內部座標
-    ctx.clearRect(0, 0, W, H);
-
-    const laneColors = ['#b266ff', '#66ccff', '#66ff66', '#ff6666'];
-    chart.forEach(n => {
-      if (n.hit) return;
-      const x = n.lane * laneWidth + laneWidth / 2;
-      ctx.fillStyle = laneColors[n.lane];
-      ctx.beginPath();
-      ctx.arc(x, n.y, 30, 0, Math.PI * 2);
-      ctx.fill();
-    });
-
-    if (lastJudgementText !== '-') {
-      ctx.fillStyle = '#fff';
-      ctx.font = 'bold 32px sans-serif';
-      ctx.textAlign = 'center';
-      const judgementYOffset = (currentDirection === 'up') ? 120 : -40; // 內部座標偏移
-      ctx.fillText(lastJudgementText, W / 2, judgeLineY + judgementYOffset);
+    /* ====== 視覺：按鍵亮起 ====== */
+    function flashKeyByLane(laneIdx) {
+      const id = ['d','f','j','k'][laneIdx];
+      const el = document.getElementById('key-' + id);
+      if (!el) return;
+      el.classList.add('flash');
+      setTimeout(() => el.classList.remove('flash'), 120);
     }
 
-    if (comboFlash) {
-      ctx.fillStyle = '#ff78b5';
-      ctx.font = 'bold 36px sans-serif';
-      ctx.textAlign = 'center';
-      ctx.fillText(comboFlash, W / 2, H / 2 - 100);
-    }
-  }
-
-  function loop(ts) {
-    if (paused) return;
-    const t = (ts - startTime) / 1000;
-    update(t);
-    render();
-
-    if (chart.every(n => n.hit)) {
-      running = false;
-      lastJudgementText = 'END';
-      updateHUD();
-
-      document.getElementById('finalSong').textContent = currentSongTitle;
-      document.getElementById('finalDiff').textContent = currentDifficulty.toUpperCase();
-      document.getElementById('finalDir').textContent  = (currentDirection === 'up' ? '上升' : '下落');
-      document.getElementById('finalJudge').textContent= (currentJudgeMode === 'old' ? 'Old' : 'New');
-      document.getElementById('finalScore').textContent = score;
-      document.getElementById('statSick').textContent = stats.sick;
-      document.getElementById('statGood').textContent = stats.good;
-      document.getElementById('statBad').textContent = stats.bad;
-      document.getElementById('statShit').textContent = stats.shit;
-      document.getElementById('statMiss').textContent = stats.miss;
-
-      document.getElementById('gameScreen').style.display = 'none';
-      document.getElementById('endScreen').style.display = 'block';
-      return;
-    }
-
-    loopId = requestAnimationFrame(loop);
-  }
-
-  /* ====== 行動端音訊解鎖 & 播放容錯 ====== */
-
-  // 1) 解鎖：在使用者點了「開始遊戲」後立刻做一次靜音播-停，打開音訊通道
-  async function unlockAudioOnce() {
-    try {
-      const wasMuted = bgm.muted;
-      bgm.muted = true;
-      await bgm.play();
-      bgm.pause();
-      bgm.muted = wasMuted;
-    } catch(e) {
-      // 某些瀏覽器仍拒絕，沒關係，後續 play() 會再回報
-      console.warn('Audio unlock failed (will retry on play):', e && e.name);
-    }
-  }
-
-  // 2) 針對奇葩檔名，嘗試多種 URL 形式
-  function candidateUrlsFor(filename) {
-    const raw = `music/${filename}`;
-    const encURI = `music/${encodeURI(filename)}`;           // 保留 ()!*' 等
-    const encComp = `music/${encodeURIComponent(filename)}`;  // 全面編碼
-    // 去重，保序
-    return Array.from(new Set([encURI, raw, encComp]));
-  }
-
-  // 3) 載入某個 URL，等到 canplay/canplaythrough/metadata 任一事件或錯誤/逾時
-  function waitForMediaReady(audio, timeoutMs = 4000) {
-    return new Promise((resolve, reject) => {
-      let timer = setTimeout(() => { cleanup(); reject(new Error('timeout')); }, timeoutMs);
-      function cleanup() {
-        clearTimeout(timer);
-        audio.removeEventListener('canplaythrough', ok);
-        audio.removeEventListener('canplay', ok);
-        audio.removeEventListener('loadedmetadata', ok);
-        audio.removeEventListener('error', fail);
-        audio.removeEventListener('stalled', fail);
-        audio.removeEventListener('abort', fail);
-      }
-      function ok() { cleanup(); resolve(); }
-      function fail() { cleanup(); reject(audio.error || new Error('media error')); }
-      audio.addEventListener('canplaythrough', ok, { once:true });
-      audio.addEventListener('canplay', ok, { once:true });
-      audio.addEventListener('loadedmetadata', ok, { once:true });
-      audio.addEventListener('error', fail, { once:true });
-      audio.addEventListener('stalled', fail, { once:true });
-      audio.addEventListener('abort', fail, { once:true });
-    });
-  }
-
-  // 4) 逐一嘗試候選 URL，成功回傳 true，失敗 false
-  async function tryPlayWithCandidates(urls) {
-    for (const u of urls) {
-      try {
-        bgm.src = u;
-        bgm.load();
-        try { await waitForMediaReady(bgm, 5000); } catch(_) {}
-        await bgm.play();
-        console.log('[BGM] playing:', u);
-        return true;
-      } catch (err) {
-        console.warn('[BGM] failed url:', u, err && (err.name || err.message));
-        // 下一個候選
-      }
-    }
-    return false;
-  }
-
-  // 5) 若這首真的播不動，自動換下一首，並在 HUD 上提示
-  async function playOrSkipToNext(pickIndex, tried = 0) {
-    const pick = SONGS[pickIndex];
-    currentSongTitle = pick.replace(/\.mp3$/i, '');
-    updateHUD();
-
-    const urls = candidateUrlsFor(pick);
-    const ok = await tryPlayWithCandidates(urls);
-    if (ok) return { index: pickIndex, ok: true };
-
-    // 換下一首（避免死循環，最多再試 3 首）
-    if (tried >= 3) {
-      lastJudgementText = 'AUDIO ERR';
-      updateHUD();
-      alert('選到的音樂檔播放失敗，可能是檔名/編碼或伺服器 MIME 設定問題。建議把檔名改成純 ASCII。');
-      return { index: pickIndex, ok: false };
-    }
-    lastJudgementText = 'SKIP SONG';
-    updateHUD();
-    const next = (pickIndex + 1) % SONGS.length;
-    return await playOrSkipToNext(next, tried + 1);
-  }
-
-  /* ====== 輸入 ====== */
-  window.addEventListener('keydown', e => {
-    const k = e.key.toLowerCase();
-    const idx = keys.indexOf(k);
-    if (idx !== -1) { pressLane(idx); }
-    if (e.key === 'Escape') { paused ? resumeGame() : pauseGame(); }
-  });
-
-  ['d','f','j','k'].forEach((k, idx) => {
-    const el = document.getElementById('key-' + k);
-    el.addEventListener('pointerdown', (e) => { e.preventDefault(); pressLane(idx); }, { passive: false });
-  });
-
-  // 以 CSS 寬度判 lane，避免 CSS 縮放下的誤判
-  canvas.addEventListener('pointerdown', (e) => {
-    e.preventDefault();
-    const rect = getCanvasRect();
-    const x = e.clientX - rect.left;
-    const cssLaneWidth = rect.width / 4;
-    const lane = Math.min(3, Math.max(0, Math.floor(x / cssLaneWidth)));
-    pressLane(lane);
-  }, { passive: false });
-
-  function pressLane(lane) {
-    if (!running) return;
-
-    const tNow = (performance.now() - startTime) / 1000;
-    let targetIndex = -1, bestAbs = Infinity;
-
-    for (let i = 0; i < chart.length; i++) {
-      const n = chart[i];
-      if (n.hit || n.lane !== lane) continue;
-      const dtMs = (tNow - n.t) * 1000;
+    /* ====== 判定 ====== */
+    function judge(dtMs) {
       const adt = Math.abs(dtMs);
-      if (adt <= TOUCH_WINDOW_MS && adt < bestAbs) {
-        bestAbs = adt; targetIndex = i;
+      let rating = '';
+      let scoreDelta = 0;
+
+      if (adt <= FNF_WINDOWS.sick) {
+        rating = 'SICK!';
+        scoreDelta = FNF_SCORES.sick;
+        stats.sick++;
+        combo += 1;
+      } else if (adt <= FNF_WINDOWS.good) {
+        rating = 'GOOD';
+        scoreDelta = FNF_SCORES.good;
+        stats.good++;
+        combo += 1;
+      } else if (adt <= FNF_WINDOWS.bad) {
+        rating = 'BAD';
+        scoreDelta = FNF_SCORES.bad;
+        stats.bad++;
+        combo += 1;
+      } else if (adt <= FNF_WINDOWS.shit) {
+        rating = 'SHIT';
+        scoreDelta = FNF_SCORES.shit;
+        stats.shit++;
+        combo = Math.max(0, combo - 1);
+      } else {
+        miss();
+        return;
+      }
+
+      score = Math.max(0, score + scoreDelta);
+      lastJudgementText = rating;
+      updateHUD();
+      hitSound.currentTime = 0;
+      hitSound.play();
+
+      if (combo > 0 && combo % 10 === 0) {
+        comboFlash = `COMBO x${combo}!!`;
+        setTimeout(() => comboFlash = '', 800);
       }
     }
 
-    if (targetIndex >= 0) {
-      const n = chart[targetIndex];
-      const dtMs = (tNow - n.t) * 1000;
-      judge(dtMs);
-      n.hit = true;
-      flashKeyByLane(lane);
-    } else {
-      if (currentJudgeMode === 'old') ghostTap();
-      flashKeyByLane(lane);
+    function miss() {
+      lastJudgementText = 'MISS';
+      combo = 0;
+      missCount++;
+      stats.miss++;
+      score = Math.max(0, score + FNF_SCORES.miss);
+      updateHUD();
+      if (currentDifficulty === 'ex' && missCount > 15) {
+        triggerFailOnce('你輸了！EX 模式 MISS 超過 15 次');
+      }
     }
-  }
 
-  /* ====== 版面變化監聽（行動端重點） ====== */
-  window.addEventListener('resize', updateHitbarPosition, { passive: true });
-  window.addEventListener('scroll', updateHitbarPosition, { passive: true });
-  if (window.visualViewport) {
-    ['resize','scroll'].forEach(ev => {
-      window.visualViewport.addEventListener(ev, updateHitbarPosition, { passive: true });
+    function ghostTap() {
+      lastJudgementText = 'MISS';
+      combo = 0;
+      score = Math.max(0, score + FNF_SCORES.ghost);
+      updateHUD();
+    }
+
+    function triggerFailOnce(msg) {
+      if (gameOver) return;
+      gameOver = true;
+      running = false;
+      try { cancelAnimationFrame(loopId); } catch {}
+      try { bgm.pause(); } catch {}
+      setTimeout(() => { alert(msg); goToMenu(); }, 0);
+    }
+
+    /* ====== 產譜 ====== */
+    function generateChart(durationSec) {
+      chart = [];
+      const difficulty = currentDifficulty;
+
+      let time = 1;
+      let doubleNoteChance = 0.35;
+      let timeGapMin = 0.20;
+      let timeGapMax = 0.45;
+
+      if (difficulty === 'beginner') {
+        doubleNoteChance = 0.15; timeGapMin = 0.30; timeGapMax = 0.60;
+      } else if (difficulty === 'easy') {
+        doubleNoteChance = 0.20; timeGapMin = 0.25; timeGapMax = 0.50;
+      } else if (difficulty === 'normal') {
+        doubleNoteChance = 0.35; timeGapMin = 0.20; timeGapMax = 0.45;
+      } else if (difficulty === 'hard') {
+        doubleNoteChance = 0.55; timeGapMin = 0.15; timeGapMax = 0.35;
+      } else if (difficulty === 'hell') {
+        doubleNoteChance = 0.75; timeGapMin = 0.10; timeGapMax = 0.25;
+      } else if (difficulty === 'ex') {
+        doubleNoteChance = 0.60; timeGapMin = 0.12; timeGapMax = 0.30;
+      }
+
+      if (!(difficulty === 'ex' || difficulty === 'hell')) {
+        while (time < durationSec) {
+          const lanesUsed = new Set();
+          const notesThisFrame = [];
+          const count = Math.random() < doubleNoteChance ? 2 : 1;
+          while (notesThisFrame.length < count) {
+            const lane = Math.floor(Math.random() * 4);
+            if (!lanesUsed.has(lane)) {
+              lanesUsed.add(lane);
+              notesThisFrame.push({ t: time, lane, type: 'tap', hit: false, y: -50 });
+            }
+          }
+          chart.push(...notesThisFrame);
+          time += Math.random() * (timeGapMax - timeGapMin) + timeGapMin;
+        }
+        return;
+      }
+
+      const beat = 0.5;
+      let t = 1;
+      let laneCursor = 0;
+      const nextLane = () => { laneCursor = (laneCursor + 1) % 4; return laneCursor; };
+      const pushNote = (tt, lane) => chart.push({ t: tt, lane, type: 'tap', hit: false, y: -50 });
+      const randLane = () => Math.floor(Math.random() * 4);
+
+      while (t < durationSec) {
+        if (difficulty === 'ex') {
+          pushNote(t, nextLane());
+          if (Math.random() < 0.60) pushNote(t, (laneCursor + 2) % 4);
+          if (Math.random() < 0.35) pushNote(t + beat / 2, (laneCursor + 1) % 4);
+          if (Math.random() < 0.18) {
+            pushNote(t + beat / 3, randLane());
+            pushNote(t + 2 * beat / 3, randLane());
+          }
+          t += Math.random() < 0.5 ? beat / 2 : beat;
+        } else {
+          pushNote(t, nextLane());
+          if (Math.random() < 0.85) pushNote(t, (laneCursor + 2) % 4);
+          pushNote(t + beat / 2, (laneCursor + 1) % 4);
+          if (Math.random() < 0.4) {
+            pushNote(t + beat / 4, randLane());
+            pushNote(t + 3 * beat / 4, randLane());
+          }
+          t += beat / 2;
+        }
+      }
+    }
+
+    /* ====== 位置計算（支援上下兩種方向） ====== */
+    function noteYAtTime(n, t) {
+      const dir = currentDirection;
+      const judgeLineY = getJudgeLineYInternal(); // 內部座標
+      if (dir === 'down') {
+        return judgeLineY - (n.t - t) * noteSpeed;
+      } else {
+        return judgeLineY + (n.t - t) * noteSpeed;
+      }
+    }
+
+    function isMiss(n, currentTimeSec) {
+      const dir = currentDirection;
+      const judgeLineY = getJudgeLineYInternal(); // 內部座標
+      const dtMs = (currentTimeSec - n.t) * 1000;
+      const beyondLineDown = n.y > judgeLineY + MISS_Y_OFFSET;
+      const beyondLineUp = n.y < judgeLineY - MISS_Y_OFFSET;
+      const graceOver = dtMs > LATE_MISS_GRACE_MS;
+      return (dir === 'down') ? (beyondLineDown && graceOver) : (beyondLineUp && graceOver);
+    }
+
+    /* ====== 更新 & 繪圖 ====== */
+    function updateHitbarPosition() {
+      if (!hitbar || document.getElementById('gameScreen').style.display === 'none') return;
+      const hitbarTopCss = getJudgeLineYCss() - hitkeyHeight / 2;
+      hitbar.style.top = `${hitbarTopCss}px`;
+    }
+
+    function update(t) {
+      chart.forEach(n => { n.y = noteYAtTime(n, t); });
+      chart.forEach(n => {
+        if (n.hit) return;
+        if (isMiss(n, t)) {
+          n.hit = true;
+          miss();
+        }
+      });
+    }
+
+    function render() {
+      const judgeLineY = getJudgeLineYInternal(); // 內部座標
+      ctx.clearRect(0, 0, W, H);
+
+      const laneColors = ['#b266ff', '#66ccff', '#66ff66', '#ff6666'];
+      chart.forEach(n => {
+        if (n.hit) return;
+        const x = n.lane * laneWidth + laneWidth / 2;
+        ctx.fillStyle = laneColors[n.lane];
+        ctx.beginPath();
+        ctx.arc(x, n.y, 30, 0, Math.PI * 2);
+        ctx.fill();
+      });
+
+      if (lastJudgementText !== '-') {
+        ctx.fillStyle = '#fff';
+        ctx.font = 'bold 32px sans-serif';
+        ctx.textAlign = 'center';
+        const judgementYOffset = (currentDirection === 'up') ? 120 : -40; // 內部座標偏移
+        ctx.fillText(lastJudgementText, W / 2, judgeLineY + judgementYOffset);
+      }
+
+      if (comboFlash) {
+        ctx.fillStyle = '#ff78b5';
+        ctx.font = 'bold 36px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText(comboFlash, W / 2, H / 2 - 100);
+      }
+    }
+
+    function loop(ts) {
+      if (paused) return;
+      const t = (ts - startTime) / 1000;
+      update(t);
+      render();
+
+      if (chart.every(n => n.hit)) {
+        running = false;
+        lastJudgementText = 'END';
+        updateHUD();
+
+        document.getElementById('finalSong').textContent = currentSongTitle;
+        document.getElementById('finalDiff').textContent = currentDifficulty.toUpperCase();
+        document.getElementById('finalDir').textContent  = (currentDirection === 'up' ? '上升' : '下落');
+        document.getElementById('finalJudge').textContent= (currentJudgeMode === 'old' ? 'Old' : 'New');
+        document.getElementById('finalScore').textContent = score;
+        document.getElementById('statSick').textContent = stats.sick;
+        document.getElementById('statGood').textContent = stats.good;
+        document.getElementById('statBad').textContent = stats.bad;
+        document.getElementById('statShit').textContent = stats.shit;
+        document.getElementById('statMiss').textContent = stats.miss;
+
+        document.getElementById('gameScreen').style.display = 'none';
+        document.getElementById('endScreen').style.display = 'block';
+        return;
+      }
+
+      loopId = requestAnimationFrame(loop);
+    }
+
+    /* ====== 輸入 ====== */
+    window.addEventListener('keydown', e => {
+      const k = e.key.toLowerCase();
+      const idx = keys.indexOf(k);
+      if (idx !== -1) { pressLane(idx); }
+      if (e.key === 'Escape') { paused ? resumeGame() : pauseGame(); }
     });
-  }
-  const stageEl = document.getElementById('stage');
-  if (window.ResizeObserver && stageEl) {
-    const ro = new ResizeObserver(() => updateHitbarPosition());
-    ro.observe(stageEl);
-  }
 
-  /* ====== 倒數 ====== */
-  function showCountdown(callback) {
-    const countdownText = document.getElementById('countdownText');
-    const steps = ['Ready', '3', '2', '1', 'Go!'];
-    let i = 0;
-    function nextStep() {
-      if (i >= steps.length) { countdownText.style.display = 'none'; callback(); return; }
-      countdownText.textContent = steps[i];
-      countdownText.style.display = 'block';
-      countdownText.classList.remove('countdown'); void countdownText.offsetWidth;
-      countdownText.classList.add('countdown');
-      i++; setTimeout(nextStep, 700);
+    ['d','f','j','k'].forEach((k, idx) => {
+      const el = document.getElementById('key-' + k);
+      el.addEventListener('pointerdown', (e) => { e.preventDefault(); pressLane(idx); }, { passive: false });
+    });
+
+    // 以 CSS 寬度判 lane，避免 CSS 縮放下的誤判
+    canvas.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      const rect = getCanvasRect();
+      const x = e.clientX - rect.left;
+      const cssLaneWidth = rect.width / 4;
+      const lane = Math.min(3, Math.max(0, Math.floor(x / cssLaneWidth)));
+      pressLane(lane);
+    }, { passive: false });
+
+    function pressLane(lane) {
+      if (!running) return;
+
+      const tNow = (performance.now() - startTime) / 1000;
+      let targetIndex = -1, bestAbs = Infinity;
+
+      for (let i = 0; i < chart.length; i++) {
+        const n = chart[i];
+        if (n.hit || n.lane !== lane) continue;
+        const dtMs = (tNow - n.t) * 1000;
+        const adt = Math.abs(dtMs);
+        if (adt <= TOUCH_WINDOW_MS && adt < bestAbs) {
+          bestAbs = adt; targetIndex = i;
+        }
+      }
+
+      if (targetIndex >= 0) {
+        const n = chart[targetIndex];
+        const dtMs = (tNow - n.t) * 1000;
+        judge(dtMs);
+        n.hit = true;
+        flashKeyByLane(lane);
+      } else {
+        if (currentJudgeMode === 'old') ghostTap();
+        flashKeyByLane(lane);
+      }
     }
-    nextStep();
-  }
 
-  /* ====== 流程 ====== */
-  async function startGame() {
-    const difficulty = document.getElementById('difficultySelect').value;
-    const speedMultiplierSelect = document.getElementById('speedMultiplier');
-    const dir = document.getElementById('noteDirection').value;
-    const jmode = document.getElementById('judgeMode').value;
-    currentDifficulty = difficulty;
-    currentDirection  = dir;
-    currentJudgeMode  = jmode;
+    /* ====== 版面變化監聽（行動端重點） ====== */
+    window.addEventListener('resize', updateHitbarPosition, { passive: true });
+    window.addEventListener('scroll', updateHitbarPosition, { passive: true });
+    if (window.visualViewport) {
+      ['resize','scroll'].forEach(ev => {
+        window.visualViewport.addEventListener(ev, updateHitbarPosition, { passive: true });
+      });
+    }
+    const stageEl = document.getElementById('stage');
+    if (window.ResizeObserver && stageEl) {
+      const ro = new ResizeObserver(() => updateHitbarPosition());
+      ro.observe(stageEl);
+    }
 
-    let multiplier = parseFloat(speedMultiplierSelect.value);
-    if      (difficulty === 'beginner') multiplier = 0.8;
-    else if (difficulty === 'easy')     multiplier = 0.9;
-    else if (difficulty === 'ex')       multiplier = 1.8;
-    noteSpeed = baseNoteSpeed * multiplier;
+    /* ====== 倒數 ====== */
+    function showCountdown(callback) {
+      const countdownText = document.getElementById('countdownText');
+      const steps = ['Ready', '3', '2', '1', 'Go!'];
+      let i = 0;
+      function nextStep() {
+        if (i >= steps.length) { countdownText.style.display = 'none'; callback(); return; }
+        countdownText.textContent = steps[i];
+        countdownText.style.display = 'block';
+        countdownText.classList.remove('countdown'); void countdownText.offsetWidth;
+        countdownText.classList.add('countdown');
+        i++; setTimeout(nextStep, 700);
+      }
+      nextStep();
+    }
 
-    document.body.classList.toggle('ex-mode', difficulty === 'ex');
+    /* ====== 流程 ====== */
+    function startGame() {
+      const difficulty = document.getElementById('difficultySelect').value;
+      const speedMultiplierSelect = document.getElementById('speedMultiplier');
+      const dir = document.getElementById('noteDirection').value;
+      const jmode = document.getElementById('judgeMode').value;
+      currentDifficulty = difficulty;
+      currentDirection  = dir;
+      currentJudgeMode  = jmode;
 
-    try { bgm.pause(); } catch {}
-    try { cancelAnimationFrame(loopId); } catch {}
-    score = 0; combo = 0; lastJudgementText = '-'; comboFlash = '';
-    chart = []; paused = false; running = true; missCount = 0; gameOver = false;
-    stats = { sick:0, good:0, bad:0, shit:0, miss:0 };
-    elapsedTimeBeforePause = 0;
-    updateHUD();
+      let multiplier = parseFloat(speedMultiplierSelect.value);
+      if      (difficulty === 'beginner') multiplier = 0.8;
+      else if (difficulty === 'easy')     multiplier = 0.9;
+      else if (difficulty === 'ex')       multiplier = 1.8;
+      noteSpeed = baseNoteSpeed * multiplier;
 
-    // 隨機選歌（先記住 index，方便 fallback 換下一首）
-    let pickIndex = Math.floor(Math.random() * SONGS.length);
+      document.body.classList.toggle('ex-mode', difficulty === 'ex');
 
-    // 畫面切換
-    document.getElementById('menuScreen').style.display = 'none';
-    document.getElementById('optionsScreen').style.display = 'none';
-    document.getElementById('endScreen').style.display = 'none';
-    document.getElementById('pauseScreen').style.display = 'none';
-    document.getElementById('gameScreen').style.display = 'block';
-    document.getElementById('gameScreen').classList.remove('blur');
+      try { bgm.pause(); } catch {}
+      try { cancelAnimationFrame(loopId); } catch {}
+      score = 0; combo = 0; lastJudgementText = '-'; comboFlash = '';
+      chart = []; paused = false; running = true; missCount = 0; gameOver = false;
+      stats = { sick:0, good:0, bad:0, shit:0, miss:0 };
+      elapsedTimeBeforePause = 0;
+      updateHUD();
 
-    // 對齊（避免初顯重排）
-    updateHitbarPosition();
-    requestAnimationFrame(updateHitbarPosition);
-    setTimeout(updateHitbarPosition, 0);
-    setTimeout(updateHitbarPosition, 50);
+      // 隨機選歌
+      const pick = SONGS[Math.floor(Math.random() * SONGS.length)];
+      currentSongTitle = pick.replace(/\.mp3$/i, '');
+      const url = 'music/' + encodeURIComponent(pick);
+      bgm.src = url;
+      bgm.load();
 
-    updateHUD();
+      // 畫面切換
+      document.getElementById('menuScreen').style.display = 'none';
+      document.getElementById('optionsScreen').style.display = 'none';
+      document.getElementById('endScreen').style.display = 'none';
+      document.getElementById('pauseScreen').style.display = 'none';
+      document.getElementById('gameScreen').style.display = 'block';
+      document.getElementById('gameScreen').classList.remove('blur');
 
-    // 先用安全預設 120 秒生成，metadata 到時再覆蓋
-    let chartFinalized = false;
-    generateChart(120);
+      // 連續校正（避免初次顯示時 layout 重排）
+      updateHitbarPosition();
+      requestAnimationFrame(updateHitbarPosition);
+      setTimeout(updateHitbarPosition, 0);
+      setTimeout(updateHitbarPosition, 50);
 
-    // 重要：使用者點了「開始遊戲」這一刻，先嘗試解鎖音訊
-    unlockAudioOnce();
+      updateHUD();
 
-    // 在倒數期間，背景先去嘗試播放（真正開始在 callback 裡確認）
-    showCountdown(async () => {
-      startTime = performance.now();
-      // 先試著以多種 URL 形式播放；失敗就自動換下一首
-      const result = await playOrSkipToNext(pickIndex);
-      pickIndex = result.index;
-
-      // 補上 metadata 時再重產譜
+      // 先用安全預設 120 秒生成，metadata 到時再覆蓋
+      let chartFinalized = false;
+      generateChart(120);
       bgm.onloadedmetadata = () => {
         if (chartFinalized) return;
         const durationSec = (!isNaN(bgm.duration) && bgm.duration > 0) ? bgm.duration : 120;
@@ -767,66 +675,67 @@
         chartFinalized = true;
       };
 
-      loopId = requestAnimationFrame(loop);
-    });
-  }
-
-  function pauseGame() {
-    if (!running || paused) return;
-    paused = true;
-    try { bgm.pause(); } catch {}
-    try { cancelAnimationFrame(loopId); } catch {}
-    elapsedTimeBeforePause = (performance.now() - startTime) / 1000;
-    document.getElementById('gameScreen').classList.add('blur');
-    document.getElementById('gameScreen').style.display = 'none';
-    document.getElementById('pauseScreen').style.display = 'block';
-  }
-
-  function resumeGame() {
-    if (!paused) return;
-    paused = false;
-    document.getElementById('pauseScreen').style.display = 'none';
-    document.getElementById('gameScreen').style.display = 'block';
-    document.getElementById('gameScreen').classList.remove('blur');
-
-    updateHitbarPosition();
-    requestAnimationFrame(updateHitbarPosition);
-
-    showCountdown(() => {
-      startTime = performance.now() - (elapsedTimeBeforePause * 1000);
-      bgm.play().catch(e=>{
-        console.warn('resume play failed:', e && e.name);
-        lastJudgementText = 'AUDIO PAUSE ERR';
-        updateHUD();
+      // 倒數後開始
+      showCountdown(() => {
+        startTime = performance.now();
+        bgm.currentTime = 0;
+        bgm.play().catch(()=>{});
+        loopId = requestAnimationFrame(loop);
       });
-      loopId = requestAnimationFrame(loop);
-    });
-  }
+    }
 
-  function goToMenu() {
-    document.getElementById('endScreen').style.display = 'none';
-    document.getElementById('gameScreen').style.display = 'none';
-    document.getElementById('optionsScreen').style.display = 'none';
-    document.getElementById('pauseScreen').style.display = 'none';
-    document.getElementById('menuScreen').style.display = 'block';
-    document.getElementById('gameScreen').classList.remove('blur');
-    document.body.classList.remove('ex-mode');
-    try { bgm.pause(); } catch {}
-  }
+    function pauseGame() {
+      if (!running || paused) return;
+      paused = true;
+      try { bgm.pause(); } catch {}
+      try { cancelAnimationFrame(loopId); } catch {}
+      elapsedTimeBeforePause = (performance.now() - startTime) / 1000;
+      document.getElementById('gameScreen').classList.add('blur');
+      document.getElementById('gameScreen').style.display = 'none';
+      document.getElementById('pauseScreen').style.display = 'block';
+    }
 
-  function showOptions() {
-    document.getElementById('menuScreen').style.display = 'none';
-    document.getElementById('optionsScreen').style.display = 'block';
-  }
+    function resumeGame() {
+      if (!paused) return;
+      paused = false;
+      document.getElementById('pauseScreen').style.display = 'none';
+      document.getElementById('gameScreen').style.display = 'block';
+      document.getElementById('gameScreen').classList.remove('blur');
 
-  // 禁右鍵 / 禁縮放
-  document.addEventListener("contextmenu", e => e.preventDefault());
-  document.addEventListener('gesturestart', e => e.preventDefault());
-  document.addEventListener('dblclick', e => e.preventDefault());
-</script>
+      // 回來再校正一次
+      updateHitbarPosition();
+      requestAnimationFrame(updateHitbarPosition);
+
+      showCountdown(() => {
+        startTime = performance.now() - (elapsedTimeBeforePause * 1000);
+        bgm.play().catch(()=>{});
+        loopId = requestAnimationFrame(loop);
+      });
+    }
+
+    function goToMenu() {
+      document.getElementById('endScreen').style.display = 'none';
+      document.getElementById('gameScreen').style.display = 'none';
+      document.getElementById('optionsScreen').style.display = 'none';
+      document.getElementById('pauseScreen').style.display = 'none';
+      document.getElementById('menuScreen').style.display = 'block';
+      document.getElementById('gameScreen').classList.remove('blur');
+      document.body.classList.remove('ex-mode');
+      try { bgm.pause(); } catch {}
+    }
+
+    function showOptions() {
+      document.getElementById('menuScreen').style.display = 'none';
+      document.getElementById('optionsScreen').style.display = 'block';
+    }
+
+    // 禁右鍵 / 禁縮放
+    document.addEventListener("contextmenu", e => e.preventDefault());
+    document.addEventListener('gesturestart', e => e.preventDefault());
+    document.addEventListener('dblclick', e => e.preventDefault());
+  </script>
 </body>
 </html>
-
 
 
 
