@@ -19,7 +19,8 @@
     }
     .hitbar {
       display: flex; justify-content: space-between; align-items: flex-end;
-      width: 95%; max-width: 420px; margin: -90px auto 40px; height: 90px; position: relative; z-index: 2;
+      width: 95%; max-width: 420px; height: 90px; position: absolute; left: 50%;
+      transform: translateX(-50%); top: 0; bottom: auto; margin: 0; z-index: 2;
     }
     .hitkey {
       flex: 1; margin: 0 5px; height: 90px; border: 3px solid transparent; border-radius: 50%;
@@ -188,6 +189,7 @@
 
     const hitSound = document.getElementById('hitSound');
     const bgm = document.getElementById('bgm');
+    const hitbar = document.querySelector('.hitbar');
 
     let baseNoteSpeed = 550;
     let noteSpeed = baseNoteSpeed;
@@ -195,6 +197,15 @@
     const JUDGE_WINDOW_MS = 200;
     const MISS_Y_OFFSET = 40;
     const TOUCH_WINDOW_MS = 200;
+
+    function updateHitbarPosition() {
+      if (!hitbar) return;
+      const gameScreen = document.getElementById('gameScreen');
+      if (!gameScreen || window.getComputedStyle(gameScreen).display === 'none') return;
+      const top = canvas.offsetTop + getJudgeLineY() - (hitkeyHeight / 2);
+      hitbar.style.top = `${top}px`;
+      hitbar.style.bottom = 'auto';
+    }
 
     // 統計
     let missCount = 0;
@@ -433,7 +444,8 @@
         ctx.fillStyle = '#fff';
         ctx.font = 'bold 32px sans-serif';
         ctx.textAlign = 'center';
-        ctx.fillText(lastJudgementText, W / 2, (currentDirection === 'up') ? judgeLineY + 40 : judgeLineY - 40);
+        const judgementY = (currentDirection === 'up') ? (H - 80) : (judgeLineY - 40);
+        ctx.fillText(lastJudgementText, W / 2, judgementY);
       }
 
       if (comboFlash) {
@@ -573,6 +585,7 @@
       currentDifficulty = difficulty;
       currentDirection  = dir;
       currentJudgeMode  = jmode;
+      document.getElementById('gameScreen').classList.toggle('direction-up', currentDirection === 'up');
 
       let multiplier = parseFloat(speedMultiplierSelect.value);
       if      (difficulty === 'beginner') multiplier = 0.8;
@@ -605,6 +618,7 @@
       document.getElementById('pauseScreen').style.display = 'none';
       document.getElementById('gameScreen').style.display = 'block';
       document.getElementById('gameScreen').classList.remove('blur');
+      updateHitbarPosition();
       updateHUD();
 
       // 先用安全預設 120 秒生成，metadata 到時再「覆蓋重產」
@@ -644,6 +658,7 @@
       document.getElementById('pauseScreen').style.display = 'none';
       document.getElementById('gameScreen').style.display = 'block';
       document.getElementById('gameScreen').classList.remove('blur');
+      updateHitbarPosition();
 
       showCountdown(() => {
         startTime = performance.now() - (elapsedTimeBeforePause * 1000);
@@ -669,6 +684,8 @@
     }
 
     // 禁右鍵 / 禁縮放
+    window.addEventListener('resize', updateHitbarPosition);
+
     document.addEventListener("contextmenu", e => e.preventDefault());
     document.addEventListener('gesturestart', e => e.preventDefault());
     document.addEventListener('dblclick', e => e.preventDefault());
