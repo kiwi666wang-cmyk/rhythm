@@ -18,8 +18,10 @@
       width: 95%; max-width: 420px; height: auto; touch-action: manipulation;
     }
     .hitbar {
-      display: flex; justify-content: space-between; align-items: flex-end;
-      width: 95%; max-width: 420px; margin: -90px auto 40px; height: 90px; position: relative; z-index: 2;
+      display: flex; justify-content: space-between; align-items: center;
+      width: 95%; max-width: 420px; height: 90px;
+      position: absolute; left: 50%; transform: translateX(-50%);
+      z-index: 2;
     }
     .hitkey {
       flex: 1; margin: 0 5px; height: 90px; border: 3px solid transparent; border-radius: 50%;
@@ -172,10 +174,12 @@
     const W = canvas.width, H = canvas.height;
     const laneWidth = W / 4;
     const hitkeyHeight = 90;
+    const hitbar = document.querySelector('.hitbar');
 
     // 打擊線位置依方向切換
     const getJudgeLineY = () => {
-      const dir = document.getElementById('noteDirection').value;
+      const dirSelect = document.getElementById('noteDirection');
+      const dir = currentDirection || (dirSelect ? dirSelect.value : 'down');
       return (dir === 'up') ? (hitkeyHeight / 2) : (H - hitkeyHeight / 2);
     };
 
@@ -397,6 +401,21 @@
     }
 
     /* ====== 更新 & 繪圖 ====== */
+    function updateHitbarPosition() {
+      if (!hitbar) return;
+      const gameScreen = document.getElementById('gameScreen');
+      if (!gameScreen || gameScreen.style.display === 'none') return;
+
+      const canvasRect = canvas.getBoundingClientRect();
+      const screenRect = gameScreen.getBoundingClientRect();
+      const relativeCanvasTop = canvasRect.top - screenRect.top;
+      const judgeLineY = getJudgeLineY();
+      const hitbarTop = relativeCanvasTop + judgeLineY - hitkeyHeight / 2;
+
+      hitbar.style.top = `${hitbarTop}px`;
+      hitbar.style.bottom = 'auto';
+    }
+
     function update(t) {
       chart.forEach(n => { n.y = noteYAtTime(n, t); });
 
@@ -429,11 +448,12 @@
         ctx.fill();
       });
 
-      if (lastJudgementText !== '-') {
+        if (lastJudgementText !== '-') {
         ctx.fillStyle = '#fff';
         ctx.font = 'bold 32px sans-serif';
         ctx.textAlign = 'center';
-        ctx.fillText(lastJudgementText, W / 2, (currentDirection === 'up') ? judgeLineY + 40 : judgeLineY - 40);
+        const judgementYOffset = (currentDirection === 'up') ? 120 : -40;
+        ctx.fillText(lastJudgementText, W / 2, judgeLineY + judgementYOffset);
       }
 
       if (comboFlash) {
@@ -500,10 +520,20 @@
       if (e.key === 'Escape') { paused ? resumeGame() : pauseGame(); }
     });
 
-    ['d','f','j','k'].forEach((k, idx) => {
+     ['d','f','j','k'].forEach((k, idx) => {
       const el = document.getElementById('key-' + k);
       el.addEventListener('pointerdown', (e) => { e.preventDefault(); pressLane(idx); }, { passive: false });
     });
+
+    window.addEventListener('resize', updateHitbarPosition);
+
+    const noteDirectionSelect = document.getElementById('noteDirection');
+    if (noteDirectionSelect) {
+      noteDirectionSelect.addEventListener('change', (e) => {
+        currentDirection = e.target.value;
+        updateHitbarPosition();
+      });
+    }
 
     canvas.addEventListener('pointerdown', (e) => {
       e.preventDefault();
@@ -601,10 +631,11 @@
       // 畫面切換
       document.getElementById('menuScreen').style.display = 'none';
       document.getElementById('optionsScreen').style.display = 'none';
-      document.getElementById('endScreen').style.display = 'none';
+       document.getElementById('endScreen').style.display = 'none';
       document.getElementById('pauseScreen').style.display = 'none';
       document.getElementById('gameScreen').style.display = 'block';
       document.getElementById('gameScreen').classList.remove('blur');
+      updateHitbarPosition();
       updateHUD();
 
       // 先用安全預設 120 秒生成，metadata 到時再「覆蓋重產」
@@ -641,9 +672,10 @@
     function resumeGame() {
       if (!paused) return;
       paused = false;
-      document.getElementById('pauseScreen').style.display = 'none';
+       document.getElementById('pauseScreen').style.display = 'none';
       document.getElementById('gameScreen').style.display = 'block';
       document.getElementById('gameScreen').classList.remove('blur');
+      updateHitbarPosition();
 
       showCountdown(() => {
         startTime = performance.now() - (elapsedTimeBeforePause * 1000);
@@ -675,6 +707,7 @@
   </script>
 </body>
 </html>
+
 
 
 
