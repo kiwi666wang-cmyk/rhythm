@@ -50,7 +50,8 @@
     }
     #menuScreen, #musicScreen, #endScreen, #optionsScreen, #pauseScreen { padding-top: 120px; }
     .blur { filter: blur(6px); pointer-events: none; user-select: none; }
-    #pauseButton { position: absolute; top: 10px; right: 10px; z-index: 3; }
+    #pauseButton { position: absolute; top: 10px; right: 10px; z-index: 4; }
+    .pause-bottom { top: auto !important; bottom: 10px !important; }
 
     /* 倒數文字：移除閃爍的透明度改為純縮放脈衝 */
     #countdownText {
@@ -212,17 +213,36 @@
   <script>
     /* ========= 參數 ========= */
     const canvas = document.getElementById('gameCanvas');
-    const ctx = canvas.getContext('2d');
+    const ctx = canvas.getContext('2d', { alpha:false, desynchronized:true });
 
     // 內部遊戲座標（固定 420x640）
     const W = canvas.width, H = canvas.height;
     const laneWidth = W / 4;
+    const lanesX = [0,1,2,3].map(i=> i*laneWidth + laneWidth/2);
     const hitbar = document.querySelector('.hitbar');
 
     // —— UI 縮放（桌機放大、手機不動） —— //
     const HITKEY_BASE = 90;    // hitbar 高度（基準）
     const NOTE_BASE   = 60;    // 箭頭基準邊
     let uiScale = 1;
+
+    // 低配偵測（手機/高DPR → 降特效；但不節流影格，以 rAF 全開追螢幕更新率）
+    const LOW_GFX = window.matchMedia('(pointer: coarse)').matches || (window.devicePixelRatio || 1) >= 3;
+    let VERY_LOW_GFX = false; // 依 FPS 動態降級
+
+    // FPS 監測（移動平均）
+    let fpsMA = 60, lastFpsTs = 0, framesSinceFps = 0;
+    function trackFps(ts){
+      framesSinceFps++;
+      if (!lastFpsTs) { lastFpsTs = ts; return; }
+      const span = ts - lastFpsTs;
+      if (span >= 250){
+        const inst = framesSinceFps * 1000 / span;
+        fpsMA = fpsMA*0.8 + inst*0.2;
+        framesSinceFps = 0; lastFpsTs = ts;
+        VERY_LOW_GFX = LOW_GFX && fpsMA < 52; // 若掉到~50fps以下，再進一步簡化
+      }
+    }
 
     // 結束判定緩衝
     const END_EARLY_GRACE = 0.25; // 秒：歌曲提早/延後結束的容錯
@@ -232,6 +252,11 @@
     let isCountingDown = false;
     let countdownTimers = [];
     let countdownRAF = null;
+
+    // 版面快取，避免每幀觸發 reflow
+    let scaleY = 1;              // CSS 高度 / 內部高度
+    let judgeLineCss = 0;        // CSS 空間中的判定線 Y
+    let judgeLineInternal = H;   // 內部座標中的判定線 Y
 
     function applyDesktopScale() {
       const isCoarse = window.matchMedia('(pointer: coarse)').matches;
@@ -245,16 +270,20 @@
         stage.style.setProperty('--u', String(u));
         stage.style.maxWidth = `${Math.round(420 * u)}px`;
       }
-      updateHitbarPosition();
+      recomputeLayout();
     }
 
-    function getCanvasRect(){ return canvas.getBoundingClientRect(); }
-    function getScaleY(){ return getCanvasRect().height / H; }
-    function getJudgeLineYCss() {
-      const rectH = getCanvasRect().height;
-      return (currentDirection === 'up') ? (HITKEY_BASE * uiScale / 2) : (rectH - HITKEY_BASE * uiScale / 2);
+    function recomputeLayout(){
+      const rect = canvas.getBoundingClientRect();
+      scaleY = rect.height / H;
+      judgeLineCss = (currentDirection === 'up') ? (HITKEY_BASE * uiScale / 2) : (rect.height - HITKEY_BASE * uiScale / 2);
+      judgeLineInternal = judgeLineCss / scaleY;
+      if (hitbar) {
+        const topPx = judgeLineCss - (HITKEY_BASE * uiScale / 2);
+        hitbar.style.top = `${topPx}px`;
+      }
+      positionPauseButton();
     }
-    function getJudgeLineYInternal() { return getJudgeLineYCss() / getScaleY(); }
 
     // 遊戲狀態
     const keys = ['d','f','j','k'];
@@ -335,23 +364,31 @@
       document.getElementById('menuChosenSong').textContent = selectedSongFile ? selectedSongFile.replace(/\.mp3$/i,'') : '尚未選擇';
     }
     function showOptions() { showOnly('optionsScreen'); }
-    function showMusic() {
+    function showMusic() { showOnly('musicScreen'); }
+
+    function fillSongList(){
       const sel = document.getElementById('songSelect');
-      if (!sel.dataset.filled) {
-        sel.innerHTML = '';
-        SONGS.forEach((f) => {
-          const opt = document.createElement('option');
-          opt.value = f;
-          opt.textContent = f.replace(/\.mp3$/i,'');
-          sel.appendChild(opt);
-        });
-        sel.addEventListener('change', () => {
-          document.getElementById('chosenSongLabel').textContent = sel.value ? sel.options[sel.selectedIndex].textContent : '尚未選擇';
-        });
-        sel.dataset.filled = '1';
-      }
-      showOnly('musicScreen');
+      if (sel.dataset.filled) return;
+      sel.innerHTML = '';
+      const placeholder = document.createElement('option');
+      placeholder.value = '';
+      placeholder.textContent = '— 請選擇曲目 —';
+      placeholder.disabled = true;
+      placeholder.selected = !selectedSongFile;
+      sel.appendChild(placeholder);
+      SONGS.forEach((f) => {
+        const opt = document.createElement('option');
+        opt.value = f;
+        opt.textContent = f.replace(/\.mp3$/i,'');
+        if (selectedSongFile === f) opt.selected = true;
+        sel.appendChild(opt);
+      });
+      sel.addEventListener('change', () => {
+        document.getElementById('chosenSongLabel').textContent = sel.value ? sel.options[sel.selectedIndex].textContent : '尚未選擇';
+      });
+      sel.dataset.filled = '1';
     }
+
     function confirmSong() {
       const sel = document.getElementById('songSelect');
       if (!sel.value) { alert('請先選擇音樂'); return; }
@@ -395,7 +432,7 @@
 
       const drawShape = (scale=1, fillStyle=baseColor, strokeStyle='#000', shadow=0)=>{
         ctx.save(); ctx.translate(x, y); ctx.rotate(angle); ctx.scale(scale, scale);
-        if (shadow>0){ ctx.shadowColor = baseColor; ctx.shadowBlur = shadow; }
+        if (!LOW_GFX && !VERY_LOW_GFX && shadow>0){ ctx.shadowColor = baseColor; ctx.shadowBlur = shadow; }
         ctx.beginPath();
         ctx.moveTo(0, -Hh/2);
         ctx.lineTo(Wd/2, -Hh/2 + headH);
@@ -405,19 +442,27 @@
         ctx.lineTo(-Wd*0.22, -Hh/2 + headH);
         ctx.lineTo(-Wd/2, -Hh/2 + headH);
         ctx.closePath();
-        const grad = ctx.createLinearGradient(0, -Hh/2, 0, Hh/2);
-        grad.addColorStop(0, '#ffffff');
-        grad.addColorStop(0.25, colorLerp('#ffffff', baseColor, .2));
-        grad.addColorStop(1, baseColor);
-        ctx.fillStyle = (fillStyle === 'gradient') ? grad : fillStyle;
-        ctx.fill();
-        ctx.lineWidth = 6; ctx.strokeStyle = strokeStyle; ctx.stroke();
+        if (LOW_GFX || VERY_LOW_GFX) {
+          ctx.fillStyle = baseColor;
+          ctx.fill();
+          ctx.lineWidth = VERY_LOW_GFX ? 1 : 2; ctx.strokeStyle = '#000'; ctx.stroke();
+        } else {
+          const grad = ctx.createLinearGradient(0, -Hh/2, 0, Hh/2);
+          grad.addColorStop(0, '#ffffff');
+          grad.addColorStop(0.25, colorLerp('#ffffff', baseColor, .2));
+          grad.addColorStop(1, baseColor);
+          ctx.fillStyle = (fillStyle === 'gradient') ? grad : fillStyle;
+          ctx.fill();
+          ctx.lineWidth = 6; ctx.strokeStyle = strokeStyle; ctx.stroke();
+        }
         ctx.restore();
       };
-      drawShape(1.0, 'gradient', '#000000', 16*glow);
-      drawShape(innerScale, 'gradient', colorLerp(baseColor,'#ffffff',0.25), 6*glow);
+      // receptor：保留些微 glow；音符：在低配下關閉 glow
+      drawShape(1.0, (LOW_GFX||VERY_LOW_GFX) ? baseColor : 'gradient', '#000000', (LOW_GFX||VERY_LOW_GFX) ? 0 : 12*glow);
+      if (!LOW_GFX && !VERY_LOW_GFX) drawShape(innerScale, 'gradient', colorLerp(baseColor,'#ffffff',0.25), 6*glow);
     }
     function drawRing(x,y,r,alpha){
+      if (LOW_GFX || VERY_LOW_GFX) return; // 低配關閉外圈動畫
       ctx.save(); ctx.globalAlpha = alpha;
       ctx.beginPath(); ctx.arc(x,y,r,0,Math.PI*2);
       ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 3; ctx.stroke();
@@ -520,24 +565,26 @@
 
     /* ====== 幾何 & 命中判定 ====== */
     function noteYAtTimeFor(tHit, tNow) {
-      const judge = getJudgeLineYInternal();
-      if (currentDirection === 'down') return judge - (tHit - tNow) * noteSpeed;
-      return judge + (tHit - tNow) * noteSpeed;
+      if (currentDirection === 'down') return judgeLineInternal - (tHit - tNow) * noteSpeed;
+      return judgeLineInternal + (tHit - tNow) * noteSpeed;
     }
     function isTapMiss(n, currentTimeSec) {
-      const judge = getJudgeLineYInternal();
       const dtMs = (currentTimeSec - n.t) * 1000;
-      const beyondDown = n.y > judge + MISS_Y_OFFSET;
-      const beyondUp = n.y < judge - MISS_Y_OFFSET;
+      const beyondDown = n.y > judgeLineInternal + MISS_Y_OFFSET;
+      const beyondUp = n.y < judgeLineInternal - MISS_Y_OFFSET;
       const graceOver = dtMs > LATE_MISS_GRACE_MS;
       return (currentDirection === 'down') ? (beyondDown && graceOver) : (beyondUp && graceOver);
     }
 
     /* ====== 更新 & 繪圖 ====== */
-    function updateHitbarPosition() {
-      if (!hitbar || document.getElementById('gameScreen').style.display === 'none') return;
-      const topPx = getJudgeLineYCss() - (HITKEY_BASE * uiScale / 2);
-      hitbar.style.top = `${topPx}px`;
+    function positionPauseButton(){
+      const btn = document.getElementById('pauseButton');
+      if (!btn) return;
+      btn.classList.remove('pause-bottom');
+      const isCoarse = window.matchMedia('(pointer: coarse)').matches;
+      if (isCoarse && currentDirection === 'up') {
+        btn.classList.add('pause-bottom'); // 移到右下角，避免與頂部 receptor 重疊
+      }
     }
 
     function update(t, dt) {
@@ -548,38 +595,40 @@
     }
 
     function render({skipNotes=false} = {}) {
-      const judge = getJudgeLineYInternal();
       ctx.clearRect(0, 0, W, H);
 
       // receptor（倒數也畫）
       for (let lane=0; lane<4; lane++){
-        const x = lane * laneWidth + laneWidth / 2;
+        const x = lanesX[lane];
         const pulse = receptorPulse[lane];
         const glowScale = 1 + 0.18 * pulse;
-        drawArrow(x, judge, NOTE_BASE * glowScale, laneDirs[lane], laneColors[lane], 0.8 + pulse);
+        drawArrow(x, judgeLineInternal, NOTE_BASE * glowScale, laneDirs[lane], laneColors[lane], 0.7 + (LOW_GFX||VERY_LOW_GFX?0:pulse));
       }
 
       // 音符（倒數時不畫，避免誤解正在開始）
       if (!skipNotes) {
         chart.forEach(n => {
           if (n.hit) return;
-          const x = n.lane * laneWidth + laneWidth / 2;
-          drawArrow(x, n.y, NOTE_BASE, laneDirs[n.lane], laneColors[n.lane], 0.6);
+          if (n.y < -100 || n.y > H+100) return; // 可視範圍裁剪
+          const x = lanesX[n.lane];
+          drawArrow(x, n.y, NOTE_BASE, laneDirs[n.lane], laneColors[n.lane], (LOW_GFX||VERY_LOW_GFX)?0:0.6);
         });
       }
 
-      hitFx.forEach(fx=>{
-        const x = fx.lane * laneWidth + laneWidth / 2;
-        const p = Math.min(1, (nowT - fx.t0) / fx.life);
-        drawRing(x, judge, 18 + 80*p, 1 - p);
-      });
+      if (!LOW_GFX && !VERY_LOW_GFX) {
+        hitFx.forEach(fx=>{
+          const x = lanesX[fx.lane];
+          const p = Math.min(1, (nowT - fx.t0) / fx.life);
+          drawRing(x, judgeLineInternal, 18 + 80*p, 1 - p);
+        });
+      }
 
       if (lastJudgementText !== '-') {
         ctx.fillStyle = '#fff';
         ctx.font = 'bold 32px sans-serif';
         ctx.textAlign = 'center';
         const offset = (currentDirection === 'up') ? 120 : -40;
-        ctx.fillText(lastJudgementText, W / 2, judge + offset);
+        ctx.fillText(lastJudgementText, W / 2, judgeLineInternal + offset);
       }
 
       if (comboFlash) {
@@ -617,8 +666,9 @@
       const dt = Math.max(0, (ts - prevTs) / 1000);
       prevTs = ts;
 
+      trackFps(ts);
       update(nowT, dt);
-      render();
+      render(); // 取消影格節流：以螢幕刷新率全速繪製
 
       // 任何一種條件到達就結束：1) 曲目播完 2) 所有音符處理完
       if (songEnded || chart.every(n => n.hit)) {
@@ -715,7 +765,7 @@
     canvas.addEventListener('pointerdown', (e) => {
       if (phase !== 'playing') return;      // 倒數時不處理點擊
       e.preventDefault();
-      const rect = getCanvasRect();
+      const rect = canvas.getBoundingClientRect();
       const x = e.clientX - rect.left;
       const cssLaneWidth = rect.width / 4;
       const lane = Math.min(3, Math.max(0, Math.floor(x / cssLaneWidth)));
@@ -789,10 +839,8 @@
       phase = 'countdown';
 
       applyDesktopScale();
-      requestAnimationFrame(updateHitbarPosition);
-      setTimeout(updateHitbarPosition, 0);
-      setTimeout(updateHitbarPosition, 50);
-
+      recomputeLayout();
+      positionPauseButton();
       updateHUD();
 
       let chartFinalized = false;
@@ -839,7 +887,7 @@
       document.getElementById('gameScreen').classList.remove('blur');
 
       applyDesktopScale();
-      requestAnimationFrame(updateHitbarPosition);
+      recomputeLayout();
 
       startTime = performance.now() - (elapsedTimeBeforePause * 1000);
       try { bgm.play().catch(()=>{}); } catch {}
@@ -850,27 +898,37 @@
     function renderIdle() {
       // 在主選單/選項/音樂頁也能維持舞台比例運算
       if (document.getElementById('gameScreen').style.display === 'block') return;
-      updateHitbarPosition();
+      recomputeLayout();
+    }
+
+    function onViewportChanged(){
+      if (phase === 'playing' || phase === 'countdown') {
+        applyDesktopScale();
+        recomputeLayout();
+      }
     }
 
     applyDesktopScale();
-    window.addEventListener('resize', () => { applyDesktopScale(); renderIdle(); }, { passive: true });
-    window.addEventListener('scroll', updateHitbarPosition, { passive: true });
+    fillSongList(); // 進站即填歌單，避免「先空白要點了才出現」
+
+    window.addEventListener('resize', onViewportChanged, { passive: true });
+    window.addEventListener('scroll', () => { if (phase==='playing'||phase==='countdown') recomputeLayout(); }, { passive: true });
     if (window.visualViewport) {
       ['resize','scroll'].forEach(ev => {
-        window.visualViewport.addEventListener(ev, () => { applyDesktopScale(); }, { passive: true });
+        window.visualViewport.addEventListener(ev, onViewportChanged, { passive: true });
       });
     }
 
-    // 禁右鍵 / 禁縮放
-    document.addEventListener("contextmenu", e => e.preventDefault());
-    document.addEventListener('gesturestart', e => e.preventDefault());
-    document.addEventListener('dblclick', e => e.preventDefault());
+    // 只在遊戲階段才阻止右鍵/縮放/雙擊，避免在「選項頁」出現操作回溯或不順
+    document.addEventListener("contextmenu", e => { if (phase==='playing'||phase==='countdown') e.preventDefault(); });
+    document.addEventListener('gesturestart', e => { if (phase==='playing'||phase==='countdown') e.preventDefault(); });
+    document.addEventListener('dblclick', e => { if (phase==='playing'||phase==='countdown') e.preventDefault(); });
 
     goToMenu();
   </script>
 </body>
 </html>
+
 
 
 
