@@ -73,6 +73,14 @@
     /* 音樂選單 */
     #songSelect { width: 90%; max-width: 420px; height: 280px; }
     #musicScreen .hint { opacity: .8; font-size: 14px; margin-top: 6px; }
+
+    /* 音樂播放警示 */
+    #audioWarn{
+      position: fixed; top: 10px; left: 50%; transform: translateX(-50%);
+      background:#ff4d4f; color:#fff; padding:8px 12px; border-radius:8px;
+      z-index: 9999; box-shadow: 0 2px 6px rgba(0,0,0,.3); display:none; font-weight:600;
+    }
+    #audioWarn button{ margin-left:8px; border:none; border-radius:6px; padding:6px 10px; cursor:pointer; }
   </style>
 </head>
 <body>
@@ -149,6 +157,13 @@
       </select>
     </div>
 
+    <!-- 新增：音量調節 -->
+    <div class="row">
+      <label for="volumeSlider">音量：</label>
+      <input type="range" id="volumeSlider" min="0" max="1" step="0.01">
+      <span id="volumeValue">80%</span>
+    </div>
+
     <div class="row">
       <button onclick="goToMenu()">回主選單</button>
     </div>
@@ -202,6 +217,12 @@
     <p>MISS：<span id="statMiss">0</span></p>
     <button onclick="startGame()">再玩一次</button>
     <button onclick="goToMenu()">回主選單</button>
+  </div>
+
+  <!-- 音樂播放警示（自動播放被擋、找不到檔案、載入卡住） -->
+  <div id="audioWarn">
+    <span id="audioWarnText">音樂播放異常</span>
+    <button id="audioRetryBtn" onclick="retryBgm()">重試播放</button>
   </div>
 
   <div id="countdownText" style="display:none;"></div>
@@ -490,6 +511,7 @@
         ct.lineTo(-Wd/2, -Hh/2 + headH);
         ct.closePath();
         const grad = ct.createLinearGradient(0, -Hh/2, 0, Hh/2);
+        ct.addHitGradientStop = grad.addColorStop.bind(grad); // 保留原始結構
         grad.addColorStop(0, '#ffffff');
         grad.addColorStop(0.25, colorLerp('#ffffff', baseColor, .2));
         grad.addColorStop(1, baseColor);
@@ -531,7 +553,6 @@
       } else {
         drawArrowTo(octx, pad, pad, size, dir, baseColor, glow, innerScale);
       }
-      // size: 貼圖在「邏輯像素」的邊長（與 dpr 無關），供繪製時使用
       return { canvas: off, half: pad, size: pad*2 };
     }
     const __SPR = { noteHQ:[], recHQ:[], noteLQ:[], recLQ:[] };
@@ -545,7 +566,6 @@
       }
     }
     function __drawSprite(sp, x, y, scale=1){
-      // DPR-safe：指定目標寬高為「邏輯尺寸」，避免高 DPI 下自動放大與偏移
       ctx.save(); ctx.translate(x,y); ctx.scale(scale,scale);
       ctx.drawImage(sp.canvas, -sp.half, -sp.half, sp.size, sp.size);
       ctx.restore();
@@ -598,6 +618,38 @@
       if (gameOver) return; gameOver = true; running = false;
       stopGameLoop(); stopAndResetBgm();
       setTimeout(() => { alert(msg); goToMenu(); }, 0);
+    }
+
+    /* === 音檔路徑容錯（全形/日文引號/異體字/間距與編碼差異） === */
+    function __normalizeVariants(name){
+      const seen = {}; const out = [];
+      function add(s){ s = s.trim(); if(!seen[s]){ seen[s]=1; out.push(s); } }
+      const nfc = name.normalize('NFC');
+      const nfd = name.normalize('NFD');
+      function swapChars(s){
+        return s
+          .replace(/【/g,'[').replace(/】/g,']')
+          .replace(/[「」]/g,'"')
+          .replace(/（/g,'(').replace(/）/g,')')
+          .replace(/☆/g,'')
+          .replace(/樂/g,'楽').replace(/聲/g,'声')
+          .replace(/\s{2,}/g,' ');
+      }
+      function under2dash(s){ return s.replace(/\s*_\s*/g,' - '); }
+      function fixRoman(s){ return s.replace(/pt\.\s*II/gi,'pt.II'); }
+      const cands = [nfc, nfd, swapChars(nfc), swapChars(nfd)];
+      cands.forEach(s => { add(s); add(under2dash(s)); add(fixRoman(s)); });
+      return out;
+    }
+    function __buildAudioCandidates(fileName){
+      const bases = __normalizeVariants(fileName);
+      const uniq = {}; const list = [];
+      bases.forEach(b=>{
+        ['music/'+b, 'music/'+encodeURI(b), 'music/'+encodeURIComponent(b)].forEach(u=>{
+          if(!uniq[u]){ uniq[u]=1; list.push(u); }
+        });
+      });
+      return list;
     }
 
     /* ====== 自動生譜（原版難度） ====== */
@@ -923,6 +975,72 @@
       }
     }
 
+    /* ====== 音量：UI + 持久化 ====== */
+    function initVolumeUI(){
+      const slider = document.getElementById('volumeSlider');
+      const label  = document.getElementById('volumeValue');
+      let v = parseFloat(localStorage.getItem('dfjk_volume') || '0.8');
+      if (isNaN(v)) v = 0.8;
+      slider.value = String(v);
+      label.textContent = `${Math.round(v*100)}%`;
+      try{ bgm.volume = v; hitSound.volume = v; }catch{}
+      slider.addEventListener('input', ()=>{
+        const nv = parseFloat(slider.value);
+        label.textContent = `${Math.round(nv*100)}%`;
+        try{ bgm.volume = nv; hitSound.volume = nv; }catch{}
+        localStorage.setItem('dfjk_volume', String(nv));
+      });
+    }
+
+    /* ====== 音樂播放提醒 & 監測 ====== */
+    let __audioWatch = { timer:null, tries:0 };
+    function showAudioWarn(msg, showRetry){
+      const box = document.getElementById('audioWarn');
+      const txt = document.getElementById('audioWarnText');
+      const btn = document.getElementById('audioRetryBtn');
+      txt.textContent = msg;
+      btn.style.display = showRetry ? 'inline-block' : 'none';
+      box.style.display = 'inline-block';
+      if (!showRetry){
+        setTimeout(()=>{ box.style.display='none'; }, 4000);
+      }
+    }
+    function hideAudioWarn(){
+      const box = document.getElementById('audioWarn');
+      box.style.display = 'none';
+    }
+    function startAudioWatch(){
+      clearAudioWatch();
+      __audioWatch.tries = 0;
+      __audioWatch.timer = setInterval(()=>{
+        __audioWatch.tries++;
+        if (bgm.currentTime > 0 && !bgm.paused && !bgm.seeking){
+          hideAudioWarn();
+          clearAudioWatch();
+          return;
+        }
+        if (__audioWatch.tries === 5){
+          showAudioWarn('音樂似乎沒有播放，請點一下「重試播放」或確認檔案存在。', true);
+        }
+        if (__audioWatch.tries > 20){
+          clearAudioWatch();
+        }
+      }, 700);
+    }
+    function clearAudioWatch(){
+      if (__audioWatch.timer){ clearInterval(__audioWatch.timer); __audioWatch.timer=null; }
+    }
+    function retryBgm(){
+      try{
+        bgm.play().then(()=>{ hideAudioWarn(); }).catch(()=>{
+          showAudioWarn('瀏覽器阻擋自動播放，請再點一次重試或輕觸畫面。', true);
+        });
+        startAudioWatch();
+      }catch(e){
+        showAudioWarn('播放重試失敗。', true);
+      }
+    }
+
     /* ====== 流程 ====== */
     function startGame() {
       if (!selectedSongFile) { alert('請先選擇音樂'); showMusic(); return; }
@@ -954,8 +1072,21 @@
       updateHUD();
 
       currentSongTitle = selectedSongFile.replace(/\.mp3$/i, '');
-      const url = 'music/' + encodeURIComponent(selectedSongFile);
-      bgm.src = url; bgm.load();
+      (function tryAudioFallback(){
+        const cand = __buildAudioCandidates(selectedSongFile);
+        let i = 0;
+        bgm.onerror = function(){
+          if (++i < cand.length) { bgm.src = cand[i]; bgm.load(); }
+          else { showAudioWarn('找不到音樂檔案或無法讀取，請確認 /music 目錄與檔名。', true); }
+        };
+        bgm.onstalled = ()=> showAudioWarn('音樂載入停滯（網路延遲或檔案問題）。', true);
+        bgm.onsuspend = ()=> {}; // 部分瀏覽器正常行為，先不提示
+        bgm.onabort   = ()=> showAudioWarn('音樂載入被中止。', true);
+        bgm.onplaying = ()=> { hideAudioWarn(); clearAudioWatch(); };
+        bgm.ontimeupdate = ()=> { if (bgm.currentTime>0) { hideAudioWarn(); } };
+        bgm.src = cand[i];
+        bgm.load();
+      })();
 
       // 追蹤音樂結束
       songEnded = false;
@@ -988,7 +1119,15 @@
         phase = 'playing';
         freezeLayout();     // 進關即固定幾何，打擊圖示不再漂
         startTime = performance.now();
-        try { bgm.currentTime = 0; bgm.play().catch(()=>{}); } catch {}
+        try {
+          const p = bgm.play();
+          if (p && typeof p.then === 'function'){
+            p.then(()=>{ hideAudioWarn(); }).catch(()=>{
+              showAudioWarn('瀏覽器阻擋自動播放，請點「重試播放」。', true);
+            });
+          }
+        } catch {}
+        startAudioWatch();
         loopId = requestAnimationFrame(loop);
       });
     }
@@ -1023,7 +1162,15 @@
 
       startTime = performance.now() - (elapsedTimeBeforePause * 1000);
       __lastRenderTs = 0;
-      try { bgm.play().catch(()=>{}); } catch {}
+      try {
+        const p = bgm.play();
+        if (p && typeof p.then === 'function'){
+          p.then(()=>{ hideAudioWarn(); }).catch(()=>{
+            showAudioWarn('瀏覽器阻擋自動播放，請點「重試播放」。', true);
+          });
+        }
+      } catch {}
+      startAudioWatch();
       loopId = requestAnimationFrame(loop);
     }
 
@@ -1043,6 +1190,7 @@
 
     applyDesktopScale();
     fillSongList();
+    initVolumeUI();
     window.addEventListener('resize', onViewportChanged, { passive: true });
     window.addEventListener('scroll', () => { if (!__layoutFrozen && (phase==='playing'||phase==='countdown')) recomputeLayout(); }, { passive: true });
     if (window.visualViewport) {
@@ -1066,6 +1214,8 @@
   </script>
 </body>
 </html>
+
+
 
 
 
