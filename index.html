@@ -377,7 +377,14 @@
       "廻廻奇譚 - Eve MV - Eve.mp3",
       "青のすみか _ キタニタツヤ - Where Our Blue Is _ Tatsuya Kitani - キタニタツヤ _ Tatsuya Kitani.mp3",
       "Toge Toge Sadistic - Enormita (youtube).mp3",
-      "My dream girls - NACHERRY (youtube).mp3"
+      "My dream girls - NACHERRY (youtube).mp3",
+      "PEACEKEEPER - STEREO DIVE FOUNDATION (youtube).mp3",
+      "米津玄師, 宇多田ヒカル Kenshi Yonezu, Hikaru Utada - JANE DOE - Kenshi Yonezu 米津玄師 (youtube).mp3",
+      "Aimer - Brave Shine - AimerOfficialVEVO (youtube).mp3",
+      "ROSA WALTON x HALLIE COGGINS - I REALLY WANT TO STAY AT YOUR HOUSE (LYRIC) AMV CYBERPUNK EDGERUNNERS - Eternity Music (youtube).mp3",
+      "米津玄師 Kenshi Yonezu - IRIS OUT - Kenshi Yonezu 米津玄師 (youtube).mp3",
+      "《崩壞：星穹鐵道》EP：「使一顆心免於哀傷」 - 崩壞 星穹鐵道 (youtube).mp3",
+      "TruE - Elysia Theme Song by Ling Huang x HOYO-MiX Official English Lyrics [Hi3 HSR Cyrene] - Yxelixi (youtube).mp3"
     ];
 
     /* ====== 音效池（讓鏘聲變大聲、可重疊播放） ====== */
@@ -541,7 +548,6 @@
         ct.lineTo(-Wd/2, -Hh/2 + headH);
         ct.closePath();
         const grad = ct.createLinearGradient(0, -Hh/2, 0, Hh/2);
-        ct.addColorStop?.call(grad, 0, '#ffffff'); // 一些引擎的相容性保護
         grad.addColorStop(0, '#ffffff');
         grad.addColorStop(0.25, colorLerp('#ffffff', baseColor, .2));
         grad.addColorStop(1, baseColor);
@@ -575,6 +581,7 @@
         octx.lineTo(-Wd/2, -Hh/2 + headH);
         octx.closePath();
         const grad = octx.createLinearGradient(0, -Hh/2, 0, Hh/2);
+        octx.addColorStop?.call(grad, 0, '#ffffff'); // 保留簡單相容，但不動核心邏輯
         grad.addColorStop(0, '#ffffff');
         grad.addColorStop(1, baseColor);
         octx.fillStyle = grad; octx.fill();
@@ -1233,8 +1240,3 @@
   </script>
 </body>
 </html>
-
-
-
-
-
