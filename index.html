@@ -224,6 +224,9 @@
     const NOTE_BASE   = 60;    // 箭頭基準邊
     let uiScale = 1;
 
+    // 結束判定緩衝
+    const END_EARLY_GRACE = 0.25; // 秒：歌曲提早/延後結束的容錯
+
     // 狀態機
     let phase = 'menu'; // 'menu' | 'countdown' | 'playing' | 'paused'
     let isCountingDown = false;
@@ -587,6 +590,26 @@
       }
     }
 
+    function endGameAndShowResult(){
+      running = false;
+      lastJudgementText = 'END';
+      updateHUD();
+      document.getElementById('finalSong').textContent = currentSongTitle;
+      document.getElementById('finalDiff').textContent = currentDifficulty.toUpperCase();
+      document.getElementById('finalDir').textContent  = (currentDirection === 'up' ? '上升' : '下落');
+      document.getElementById('finalJudge').textContent= (currentJudgeMode === 'old' ? 'Old' : 'New');
+      document.getElementById('finalScore').textContent = score;
+      document.getElementById('statSick').textContent = stats.sick;
+      document.getElementById('statGood').textContent = stats.good;
+      document.getElementById('statBad').textContent = stats.bad;
+      document.getElementById('statShit').textContent = stats.shit;
+      document.getElementById('statMiss').textContent = stats.miss;
+      showOnly('endScreen');
+      phase = 'menu';
+    }
+
+    let songEnded = false; // 追蹤音樂實際結束
+
     function loop(ts) {
       if (paused) return;
       if (!prevTs) prevTs = ts;
@@ -597,23 +620,9 @@
       update(nowT, dt);
       render();
 
-      if (chart.every(n => n.hit)) {
-        running = false;
-        lastJudgementText = 'END';
-        updateHUD();
-        document.getElementById('finalSong').textContent = currentSongTitle;
-        document.getElementById('finalDiff').textContent = currentDifficulty.toUpperCase();
-        document.getElementById('finalDir').textContent  = (currentDirection === 'up' ? '上升' : '下落');
-        document.getElementById('finalJudge').textContent= (currentJudgeMode === 'old' ? 'Old' : 'New');
-        document.getElementById('finalScore').textContent = score;
-        document.getElementById('statSick').textContent = stats.sick;
-        document.getElementById('statGood').textContent = stats.good;
-        document.getElementById('statBad').textContent = stats.bad;
-        document.getElementById('statShit').textContent = stats.shit;
-        document.getElementById('statMiss').textContent = stats.miss;
-
-        showOnly('endScreen');
-        phase = 'menu';
+      // 任何一種條件到達就結束：1) 曲目播完 2) 所有音符處理完
+      if (songEnded || chart.every(n => n.hit)) {
+        endGameAndShowResult();
         return;
       }
 
@@ -771,6 +780,11 @@
       const url = 'music/' + encodeURIComponent(selectedSongFile);
       bgm.src = url; bgm.load();
 
+      // 重新掛載 ended 事件以避免多次綁定
+      songEnded = false;
+      bgm.onended = null;
+      bgm.onended = () => { songEnded = true; };
+
       showOnly('gameScreen');
       phase = 'countdown';
 
@@ -857,8 +871,6 @@
   </script>
 </body>
 </html>
-
-
 
 
 
