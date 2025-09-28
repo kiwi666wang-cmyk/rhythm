@@ -1074,26 +1074,37 @@
       showOnly('pauseScreen');
     }
 
-    function resumeGame() {
-      if (!paused) return;
-      paused = false;
-      phase = 'playing';
-      showOnly('gameScreen');
-      document.getElementById('gameScreen').classList.remove('blur');
+   function resumeGame() {
+  if (!paused) return;
+  paused = false;
 
-      applyDesktopScale();
-      recomputeLayout();
-      freezeLayout();     // 繼續時再度固定
+  // 先回到遊戲畫面，但進入倒數階段，不要立刻播放或跑迴圈
+  showOnly('gameScreen');
+  document.getElementById('gameScreen').classList.remove('blur');
 
-      startTime = performance.now() - (elapsedTimeBeforePause * 1000);
-      __lastRenderTs = 0;
-      try {
-        const p = bgm.play();
-        if (p && typeof p.catch === 'function') p.catch(() => showPlayWarning());
-      } catch {}
-      guardAudioPlayback();
-      loopId = requestAnimationFrame(loop);
-    }
+  applyDesktopScale();
+  recomputeLayout();
+
+  // 進入倒數模式：只顯示接收器，不更新音符位置與時間
+  phase = 'countdown';
+  showCountdown(() => {
+    // 倒數結束才真正恢復
+    phase = 'playing';
+    freezeLayout(); // 恢復時固定幾何，避免打擊圖示位移
+
+    // 讓譜面時間點與音樂保持「暫停前」的對齊
+    startTime = performance.now() - (elapsedTimeBeforePause * 1000);
+    __lastRenderTs = 0;
+
+    try {
+      const p = bgm.play();
+      if (p && typeof p.catch === 'function') p.catch(() => showPlayWarning());
+    } catch {}
+
+    guardAudioPlayback();
+    loopId = requestAnimationFrame(loop);
+  });
+}
 
     /* ====== 初始化 ====== */
     function renderIdle() {
@@ -1136,3 +1147,4 @@
   </script>
 </body>
 </html>
+
