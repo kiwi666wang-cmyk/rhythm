@@ -2,6 +2,7 @@
 <html lang="zh-Hant">
 <head>
   <meta charset="UTF-8" />
+  <!-- 行動裝置：關閉縮放、雙擊放大、pinch -->
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>DFJK 節奏遊戲</title>
   <link href="https://fonts.googleapis.com/css2?family=Fredoka+One&display=swap" rel="stylesheet">
@@ -31,30 +32,16 @@
       touch-action: manipulation;
     }
 
+    /* DOM hitbar 只是定位參考（FNF receptor 改由 canvas 畫） */
     .hitbar {
+      position: absolute; left: 0; width: 100%;
       display: flex; justify-content: space-between; align-items: center;
       height: calc(90px * var(--u));
-      position: absolute; left: 0; width: 100%;
       z-index: 2;
+      opacity: 0;
+      pointer-events: none;
     }
-
-    .hitkey {
-      flex: 1;
-      margin: 0 5px;
-      height: calc(90px * var(--u));
-      border: calc(3px * var(--u)) solid transparent;
-      border-radius: 50%;
-      box-sizing: border-box;
-      background: rgba(255,255,255,.05);
-      font-size: calc(36px * var(--u));
-      font-weight: bold;
-      display: flex; align-items: center; justify-content: center;
-      transition: transform .2s, box-shadow .2s;
-      user-select: none; -webkit-user-select: none; touch-action: manipulation;
-    }
-    #key-d { color:#b266ff; border-color:#b266ff; }  #key-f { color:#66ccff; border-color:#66ccff; }
-    #key-j { color:#66ff66; border-color:#66ff66; }  #key-k { color:#ff6666; border-color:#ff6666; }
-    .hitkey.flash { transform: scale(1.4); box-shadow: 0 0 20px currentColor; background: rgba(255,255,255,.2); }
+    .hitkey { flex:1; margin:0 5px; height:calc(90px * var(--u)); }
 
     .hud { font-size: 18px; margin-top: 10px; line-height: 1.6; }
     .songline { font-size: 14px; opacity: .9; }
@@ -64,16 +51,21 @@
     #menuScreen, #musicScreen, #endScreen, #optionsScreen, #pauseScreen { padding-top: 120px; }
     .blur { filter: blur(6px); pointer-events: none; user-select: none; }
     #pauseButton { position: absolute; top: 10px; right: 10px; z-index: 3; }
-    .countdown {
+
+    /* 倒數文字：移除閃爍的透明度改為純縮放脈衝 */
+    #countdownText {
       position: absolute; top: 40%; left: 50%; transform: translate(-50%,-50%);
       font-family: 'Fredoka One', sans-serif; font-size: 72px; color: #fff; text-shadow: 2px 2px 8px #000; z-index: 5;
-      animation: pop .6s ease-out; pointer-events: none;
+      pointer-events: none;
+      opacity: 1;            /* 全程維持可見，不用 0/1 跳變 */
+      will-change: transform;
     }
-    @keyframes pop {
-      0% { transform: scale(.5) translate(-50%,-50%); opacity:0; }
-      50% { transform: scale(1.2) translate(-50%,-50%); opacity:1; }
-      100% { transform: scale(1) translate(-50%,-50%); opacity:0; }
+    @keyframes popScale {
+      0%   { transform: translate(-50%,-50%) scale(0.85); }
+      50%  { transform: translate(-50%,-50%) scale(1.12); }
+      100% { transform: translate(-50%,-50%) scale(1.00); }
     }
+
     .row { margin: 10px 0; }
     label { margin-right: 6px; }
     select { padding: 6px 10px; border-radius: 6px; border: 1px solid #445; background:#12152a; color:#fff; }
@@ -170,10 +162,10 @@
       <canvas id="gameCanvas" width="420" height="640"></canvas>
 
       <div class="hitbar">
-        <div class="hitkey" id="key-d">←</div>
-        <div class="hitkey" id="key-f">↓</div>
-        <div class="hitkey" id="key-j">↑</div>
-        <div class="hitkey" id="key-k">→</div>
+        <div class="hitkey" id="key-d"></div>
+        <div class="hitkey" id="key-f"></div>
+        <div class="hitkey" id="key-j"></div>
+        <div class="hitkey" id="key-k"></div>
       </div>
     </div>
 
@@ -212,7 +204,7 @@
     <button onclick="goToMenu()">回主選單</button>
   </div>
 
-  <div id="countdownText" class="countdown" style="display:none;"></div>
+  <div id="countdownText" style="display:none;"></div>
 
   <audio id="hitSound" src="https://cdn.pixabay.com/download/audio/2022/03/15/audio_6e3e3b6f3f.mp3?filename=click-124467.mp3"></audio>
   <audio id="bgm"></audio>
@@ -228,10 +220,15 @@
     const hitbar = document.querySelector('.hitbar');
 
     // —— UI 縮放（桌機放大、手機不動） —— //
-    const HITKEY_BASE = 90;
-    const NOTE_RADIUS = 30;               // 單鍵半徑 & 長鍵端帽半徑
-    const HOLD_BODY_W = NOTE_RADIUS * 2;  // 長鍵直條寬 = 直徑（確保無縫）
+    const HITKEY_BASE = 90;    // hitbar 高度（基準）
+    const NOTE_BASE   = 60;    // 箭頭基準邊
     let uiScale = 1;
+
+    // 狀態機
+    let phase = 'menu'; // 'menu' | 'countdown' | 'playing' | 'paused'
+    let isCountingDown = false;
+    let countdownTimers = [];
+    let countdownRAF = null;
 
     function applyDesktopScale() {
       const isCoarse = window.matchMedia('(pointer: coarse)').matches;
@@ -250,22 +247,22 @@
 
     function getCanvasRect(){ return canvas.getBoundingClientRect(); }
     function getScaleY(){ return getCanvasRect().height / H; }
-
     function getJudgeLineYCss() {
       const rectH = getCanvasRect().height;
       return (currentDirection === 'up') ? (HITKEY_BASE * uiScale / 2) : (rectH - HITKEY_BASE * uiScale / 2);
     }
-    function getJudgeLineYInternal() {
-      return getJudgeLineYCss() / getScaleY();
-    }
+    function getJudgeLineYInternal() { return getJudgeLineYCss() / getScaleY(); }
 
+    // 遊戲狀態
     const keys = ['d','f','j','k'];
     const keyToLane = { d:0, f:1, j:2, k:3 };
+    const laneDirs = ['left','down','up','right'];
 
     let score = 0, combo = 0, lastJudgementText = '-';
     let startTime = 0, running = false, paused = false, loopId = null;
     let chart = [], comboFlash = '';
     let elapsedTimeBeforePause = 0;
+    let nowT = 0, prevTs = 0;
 
     const hitSound = document.getElementById('hitSound');
     const bgm = document.getElementById('bgm');
@@ -274,11 +271,10 @@
     let noteSpeed = baseNoteSpeed;
 
     const FNF_WINDOWS = { sick: 70, good: 118, bad: 123, shit: 138 };
-    const FNF_SCORES  = { sick: 350, good: 200, bad: 100, shit: -50, miss: -300, ghost: -150, holdTail: 300 };
+    const FNF_SCORES  = { sick: 350, good: 200, bad: 100, shit: -50, miss: -300, ghost: -150 };
     const MISS_Y_OFFSET = 40;
     const TOUCH_WINDOW_MS = FNF_WINDOWS.shit;
     const LATE_MISS_GRACE_MS = 120;
-    const HOLD_DROP_GRACE_MS = 80;
 
     // 統計
     let missCount = 0;
@@ -294,14 +290,10 @@
     // 音樂選擇（必選）
     let selectedSongFile = null;
 
-    // 輸入狀態
-    const lanePressed = [false,false,false,false];
-    const lanePointers = [new Set(), new Set(), new Set(), new Set()];
-
     // 曲庫（請確保 /music 檔名一致）
     const SONGS = [
       "Charlie Puth - Light Switch [Official Music Video] - Charlie Puth.mp3",
-      "Creepy Nuts - オトノケ(Otonoke) 【Official MV】 [Dandadan OP] - Creepy Nuts.mp3",
+      "Creepy Nuts - オトノケ(Otonoke) 【Official MV】 [Dandandan OP] - Creepy Nuts.mp3",
       "Creepy Nuts ”Mirage” × Anime ”Call of the Night” Collaboration Music Video Opening Theme Song - Creepy Nuts.mp3",
       "Creepy Nuts ”Nemure” × Anime ”Call of the Night” Collaboration Music Video Ending Theme Song - Creepy Nuts (1).mp3",
       "Creepy Nuts｢Bling-Bang-Bang-Born｣ × TV Anime｢マッシュル-MASHLE-｣ Collaboration Music Video #BBBBダンス - Creepy Nuts.mp3",
@@ -331,9 +323,12 @@
       if (id !== 'gameScreen') document.getElementById('gameScreen').classList.remove('blur');
     }
     function goToMenu() {
+      cancelCountdown();              // <- 防止倒數殘留
+      stopGameLoop();                 // <- 防止遊戲 RAF 殘留
+      stopAndResetBgm();              // <- 立刻停歌
       showOnly('menuScreen');
+      phase = 'menu';
       document.body.classList.remove('ex-mode');
-      try { bgm.pause(); } catch {}
       document.getElementById('menuChosenSong').textContent = selectedSongFile ? selectedSongFile.replace(/\.mp3$/i,'') : '尚未選擇';
     }
     function showOptions() { showOnly('optionsScreen'); }
@@ -375,70 +370,75 @@
       document.getElementById('judgeLabel').textContent = (currentJudgeMode === 'old' ? 'Old' : 'New');
     }
 
-    /* ====== 視覺：按鍵亮起 ====== */
-    function flashKeyByLane(laneIdx) {
-      const id = ['d','f','j','k'][laneIdx];
-      const el = document.getElementById('key-' + id);
-      if (!el) return;
-      el.classList.add('flash');
-      setTimeout(() => el.classList.remove('flash'), 120);
-    }
+    /* ====== 視覺（FNF 箭頭 + 現代感） ====== */
+    const laneColors = ['#b266ff', '#66ccff', '#66ff66', '#ff6666'];
+    const receptorPulse = [0,0,0,0];
+    const hitFx = [];
 
-    /* ====== 打擊特效（ring burst / lane glow） ====== */
-    const fx = []; // {type:'ring', x,y,t0,dur,maxR,color}
-    function vibrate(ms){ if (navigator.vibrate) try{ navigator.vibrate(ms); }catch{} }
-    function spawnRing(x, y, color) {
-      fx.push({ type:'ring', x, y, t0: performance.now(), dur: 220, maxR: 70, color });
+    function colorLerp(a, b, t){
+      const pa = parseInt(a.slice(1),16), pb = parseInt(b.slice(1),16);
+      const ar=(pa>>16)&255, ag=(pa>>8)&255, ab=pa&255;
+      const br=(pb>>16)&255, bg=(pb>>8)&255, bb=pb&255;
+      const r=Math.round(ar+(br-ar)*t), g=Math.round(ag+(bg-ag)*t), b2=Math.round(ab+(bb-ab)*t);
+      return `rgb(${r},${g},${b2})`;
     }
-    function renderFX() {
-      const now = performance.now();
-      for (let i = fx.length - 1; i >= 0; i--) {
-        const e = fx[i];
-        const t = (now - e.t0) / e.dur;
-        if (t >= 1) { fx.splice(i,1); continue; }
-        if (e.type === 'ring') {
-          const r = easeOutQuad(t) * e.maxR;
-          ctx.save();
-          ctx.globalAlpha = 1 - t;
-          ctx.lineWidth = 3;
-          ctx.strokeStyle = e.color;
-          ctx.beginPath();
-          ctx.arc(e.x, e.y, r, 0, Math.PI*2);
-          ctx.stroke();
-          ctx.restore();
-        }
-      }
+    function dirToAngle(dir){
+      switch(dir){ case 'up': return 0; case 'down': return Math.PI; case 'left': return -Math.PI/2; case 'right': return Math.PI/2; }
+      return 0;
     }
-    function easeOutQuad(t){ return 1 - (1-t)*(1-t); }
+    function drawArrow(x, y, size, dir, baseColor, glow = 1, innerScale = 0.7){
+      const angle = dirToAngle(dir);
+      const Hh = size * 1.15, Wd = size, headH = Hh * 0.55;
+
+      const drawShape = (scale=1, fillStyle=baseColor, strokeStyle='#000', shadow=0)=>{
+        ctx.save(); ctx.translate(x, y); ctx.rotate(angle); ctx.scale(scale, scale);
+        if (shadow>0){ ctx.shadowColor = baseColor; ctx.shadowBlur = shadow; }
+        ctx.beginPath();
+        ctx.moveTo(0, -Hh/2);
+        ctx.lineTo(Wd/2, -Hh/2 + headH);
+        ctx.lineTo(Wd*0.22, -Hh/2 + headH);
+        ctx.lineTo(Wd*0.22,  Hh/2);
+        ctx.lineTo(-Wd*0.22, Hh/2);
+        ctx.lineTo(-Wd*0.22, -Hh/2 + headH);
+        ctx.lineTo(-Wd/2, -Hh/2 + headH);
+        ctx.closePath();
+        const grad = ctx.createLinearGradient(0, -Hh/2, 0, Hh/2);
+        grad.addColorStop(0, '#ffffff');
+        grad.addColorStop(0.25, colorLerp('#ffffff', baseColor, .2));
+        grad.addColorStop(1, baseColor);
+        ctx.fillStyle = (fillStyle === 'gradient') ? grad : fillStyle;
+        ctx.fill();
+        ctx.lineWidth = 6; ctx.strokeStyle = strokeStyle; ctx.stroke();
+        ctx.restore();
+      };
+      drawShape(1.0, 'gradient', '#000000', 16*glow);
+      drawShape(innerScale, 'gradient', colorLerp(baseColor,'#ffffff',0.25), 6*glow);
+    }
+    function drawRing(x,y,r,alpha){
+      ctx.save(); ctx.globalAlpha = alpha;
+      ctx.beginPath(); ctx.arc(x,y,r,0,Math.PI*2);
+      ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 3; ctx.stroke();
+      ctx.restore();
+    }
+    function flashKeyByLane(laneIdx) { receptorPulse[laneIdx] = 1; }
 
     /* ====== 判定 ====== */
-    function judge(dtMs) {
+    function judge(dtMs, lane) {
       const adt = Math.abs(dtMs);
       let rating = '', scoreDelta = 0;
-
-      if (adt <= FNF_WINDOWS.sick) { rating = 'SICK!'; scoreDelta = FNF_SCORES.sick; stats.sick++; combo++; }
-      else if (adt <= FNF_WINDOWS.good) { rating = 'GOOD'; scoreDelta = FNF_SCORES.good; stats.good++; combo++; }
-      else if (adt <= FNF_WINDOWS.bad) { rating = 'BAD'; scoreDelta = FNF_SCORES.bad; stats.bad++; combo++; }
-      else if (adt <= FNF_WINDOWS.shit) { rating = 'SHIT'; scoreDelta = FNF_SCORES.shit; stats.shit++; combo = Math.max(0, combo-1); }
+      if (adt <= FNF_WINDOWS.sick)      { rating = 'SICK!'; scoreDelta = FNF_SCORES.sick; stats.sick++; combo++; }
+      else if (adt <= FNF_WINDOWS.good) { rating = 'GOOD';  scoreDelta = FNF_SCORES.good; stats.good++; combo++; }
+      else if (adt <= FNF_WINDOWS.bad)  { rating = 'BAD';   scoreDelta = FNF_SCORES.bad;  stats.bad++;  combo++; }
+      else if (adt <= FNF_WINDOWS.shit) { rating = 'SHIT';  scoreDelta = FNF_SCORES.shit; stats.shit++; combo = Math.max(0, combo-1); }
       else { miss(); return; }
-
       score = Math.max(0, score + scoreDelta);
       lastJudgementText = rating;
+      receptorPulse[lane] = 1;
+      hitFx.push({lane, t0: nowT, life: 0.25});
       updateHUD();
-      hitSound.currentTime = 0; hitSound.play().catch(()=>{});
+      try{ hitSound.currentTime = 0; hitSound.play(); }catch{}
       if (combo > 0 && combo % 10 === 0) { comboFlash = `COMBO x${combo}!!`; setTimeout(() => comboFlash = '', 800); }
     }
-
-    function awardHoldTail(dtMs) {
-      const adt = Math.abs(dtMs);
-      let rating = '', scoreDelta = 0;
-      if (adt <= FNF_WINDOWS.good) { rating='HOLD OK'; scoreDelta=FNF_SCORES.holdTail; combo++; }
-      else if (adt <= FNF_WINDOWS.shit) { rating='HOLD LATE'; scoreDelta=Math.floor(FNF_SCORES.holdTail*0.6); combo++; }
-      else { miss(); return; }
-      score = Math.max(0, score + scoreDelta);
-      lastJudgementText = rating; updateHUD();
-    }
-
     function miss() {
       lastJudgementText = 'MISS';
       combo = 0; missCount++; stats.miss++;
@@ -446,76 +446,76 @@
       updateHUD();
       if (currentDifficulty === 'ex' && missCount > 15) triggerFailOnce('你輸了！EX 模式 MISS 超過 15 次');
     }
-    function ghostTap() { lastJudgementText='MISS'; combo=0; score=Math.max(0, score+FNF_SCORES.ghost); updateHUD(); }
+    function ghostTap(lane) { lastJudgementText='MISS'; combo=0; score=Math.max(0, score+FNF_SCORES.ghost); receptorPulse[lane]=0.5; updateHUD(); }
     function triggerFailOnce(msg) {
       if (gameOver) return; gameOver = true; running = false;
-      try { cancelAnimationFrame(loopId); } catch {}
-      try { bgm.pause(); } catch {}
+      stopGameLoop(); stopAndResetBgm();
       setTimeout(() => { alert(msg); goToMenu(); }, 0);
     }
 
-    /* ====== 自動生譜：提高長鍵出現率，長鍵區間封鎖 ====== */
+    /* ====== 自動生譜（原版難度） ====== */
     function generateChart(durationSec) {
       chart = [];
-      const diff = currentDifficulty;
+      const difficulty = currentDifficulty;
+      let doubleNoteChance = 0.35;
+      let timeGapMin = 0.20;
+      let timeGapMax = 0.45;
+      if (difficulty === 'beginner')      { doubleNoteChance = 0.15; timeGapMin = 0.30; timeGapMax = 0.60; }
+      else if (difficulty === 'easy')     { doubleNoteChance = 0.20; timeGapMin = 0.25; timeGapMax = 0.50; }
+      else if (difficulty === 'normal')   { doubleNoteChance = 0.35; timeGapMin = 0.20; timeGapMax = 0.45; }
+      else if (difficulty === 'hard')     { doubleNoteChance = 0.55; timeGapMin = 0.15; timeGapMax = 0.35; }
 
-      let beat = 0.5;
-      if (diff === 'beginner') beat = 0.6;
-      else if (diff === 'easy') beat = 0.55;
-      else if (diff === 'hard') beat = 0.45;
-      else if (diff === 'hell' || diff === 'ex') beat = 0.4;
-
-      // ⬆️ 調高長鍵機率（比上一版更高）
-      let holdChance = 0.14, holdLenMin = 2, holdLenMax = 5;
-      if (diff === 'beginner') { holdChance = 0.06; holdLenMin = 2; holdLenMax = 3; }
-      else if (diff === 'easy') { holdChance = 0.10; holdLenMin = 2; holdLenMax = 4; }
-      else if (diff === 'normal') { holdChance = 0.18; holdLenMin = 2; holdLenMax = 6; }
-      else if (diff === 'hard') { holdChance = 0.24; holdLenMin = 2; holdLenMax = 7; }
-      else if (diff === 'hell') { holdChance = 0.30; holdLenMin = 2; holdLenMax = 8; }
-      else if (diff === 'ex') { holdChance = 0.28; holdLenMin = 2; holdLenMax = 8; }
-
-      const blocks = [[],[],[],[]]; // 每 lane 封鎖區間 [s,e]
-
-      let time = 1;
-      while (time < durationSec) {
-        const subdiv = (diff === 'hell' || diff === 'ex') ? [1, 0.5, 0.25] : [1, 0.5];
-        const step = beat * subdiv[Math.floor(Math.random()*subdiv.length)];
-        time = Math.round((time + step) / (beat/4)) * (beat/4);
-        if (time >= durationSec) break;
-
-        const makeHold = Math.random() < holdChance;
-
-        if (makeHold) {
-          let laneTry = 0, lane = Math.floor(Math.random()*4);
-          const lenBeats = Math.floor(Math.random()*(holdLenMax-holdLenMin+1)) + holdLenMin;
-          const tStart = time;
-          const tEnd = Math.min(durationSec, tStart + lenBeats * beat);
-
-          while (laneTry < 8) {
-            if (!intervalOverlaps(blocks[lane], tStart, tEnd)) break;
-            lane = (lane + 1) % 4; laneTry++;
+      if (!(difficulty === 'ex' || difficulty === 'hell')) {
+        let time = 1;
+        while (time < durationSec) {
+          const lanesUsed = new Set();
+          const notesThisFrame = [];
+          const count = Math.random() < doubleNoteChance ? 2 : 1;
+          while (notesThisFrame.length < count) {
+            const lane = Math.floor(Math.random() * 4);
+            if (!lanesUsed.has(lane)) {
+              lanesUsed.add(lane);
+              notesThisFrame.push({ t: time, lane, type: 'tap', hit: false, y: -50 });
+            }
           }
-          if (laneTry >= 8) continue;
-
-          chart.push({ type:'hold', lane, t:tStart, end:tEnd, headHit:false, failed:false, done:false });
-          blocks[lane].push([tStart, tEnd]);
-          continue;
+          chart.push(...notesThisFrame);
+          time += Math.random() * (timeGapMax - timeGapMin) + timeGapMin;
         }
+        return;
+      }
 
-        const lanes = [0,1,2,3].sort(()=>Math.random()-0.5);
-        for (const lane of lanes) {
-          if (!intervalContains(blocks[lane], time)) {
-            chart.push({ type:'tap', lane, t:time, hit:false, y:-50 });
-            break;
+      // EX / HELL（原本的較密集邏輯）
+      const beat = 0.5;
+      let t = 1;
+      let laneCursor = 0;
+      const nextLane = () => { laneCursor = (laneCursor + 1) % 4; return laneCursor; };
+      const pushNote = (tt, lane) => chart.push({ t: tt, lane, type: 'tap', hit: false, y: -50 });
+      const randLane = () => Math.floor(Math.random() * 4);
+
+      while (t < durationSec) {
+        if (difficulty === 'ex') {
+          pushNote(t, nextLane());
+          if (Math.random() < 0.60) pushNote(t, (laneCursor + 2) % 4);
+          if (Math.random() < 0.35) pushNote(t + beat / 2, (laneCursor + 1) % 4);
+          if (Math.random() < 0.18) {
+            pushNote(t + beat / 3, randLane());
+            pushNote(t + 2 * beat / 3, randLane());
           }
+          t += Math.random() < 0.5 ? beat / 2 : beat;
+        } else {
+          pushNote(t, nextLane());
+          if (Math.random() < 0.85) pushNote(t, (laneCursor + 2) % 4);
+          pushNote(t + beat / 2, (laneCursor + 1) % 4);
+          if (Math.random() < 0.4) {
+            pushNote(t + beat / 4, randLane());
+            pushNote(t + 3 * beat / 4, randLane());
+          }
+          t += beat / 2;
         }
       }
     }
 
-    function intervalOverlaps(list, a, b) { return list.some(([s,e]) => Math.max(s,a) < Math.min(e,b) - 1e-6); }
-    function intervalContains(list, x) { return list.some(([s,e]) => x > s - 1e-6 && x < e + 1e-6); }
-
-    /* ====== 幾何 ====== */
+    /* ====== 幾何 & 命中判定 ====== */
     function noteYAtTimeFor(tHit, tNow) {
       const judge = getJudgeLineYInternal();
       if (currentDirection === 'down') return judge - (tHit - tNow) * noteSpeed;
@@ -529,45 +529,6 @@
       const graceOver = dtMs > LATE_MISS_GRACE_MS;
       return (currentDirection === 'down') ? (beyondDown && graceOver) : (beyondUp && graceOver);
     }
-    function isHoldHeadLate(n, currentTimeSec) {
-      const dtMs = (currentTimeSec - n.t) * 1000;
-      return dtMs > FNF_WINDOWS.shit + LATE_MISS_GRACE_MS;
-    }
-
-    /* ====== 呈現：長鍵畫成「實心半圓頭 + 實心長方形 + 實心半圓尾」 ====== */
-    function drawHoldCapsule(xCenter, y1, y2, fillColor, strokeColor, innerGlow=false) {
-      const r = NOTE_RADIUS;
-      const top = Math.min(y1, y2);
-      const bottom = Math.max(y1, y2);
-      const left = xCenter - r;
-      const right = xCenter + r;
-
-      // 外型
-      ctx.beginPath();
-      ctx.moveTo(left, top + r);
-      ctx.arc(xCenter, top + r, r, Math.PI, 0);
-      ctx.lineTo(right, bottom - r);
-      ctx.arc(xCenter, bottom - r, r, 0, Math.PI);
-      ctx.closePath();
-
-      ctx.fillStyle = fillColor;
-      ctx.fill();
-
-      // 邊線
-      ctx.lineWidth = 4;
-      ctx.strokeStyle = strokeColor;
-      ctx.stroke();
-
-      // 內部微光（按住時）
-      if (innerGlow) {
-        const grad = ctx.createLinearGradient(xCenter, top, xCenter, bottom);
-        grad.addColorStop(0, 'rgba(255,255,255,.18)');
-        grad.addColorStop(0.5, 'rgba(255,255,255,.10)');
-        grad.addColorStop(1, 'rgba(255,255,255,.18)');
-        ctx.fillStyle = grad;
-        ctx.fill();
-      }
-    }
 
     /* ====== 更新 & 繪圖 ====== */
     function updateHitbarPosition() {
@@ -575,87 +536,41 @@
       const topPx = getJudgeLineYCss() - (HITKEY_BASE * uiScale / 2);
       hitbar.style.top = `${topPx}px`;
     }
-    function isConsumed(n) { return n.type === 'tap' ? n.hit : n.done; }
 
-    function update(t) {
-      chart.forEach(n => { if (n.type === 'tap') n.y = noteYAtTimeFor(n.t, t); });
-
-      chart.forEach(n => {
-        if (n.type !== 'tap' || n.hit) return;
-        if (isTapMiss(n, t)) { n.hit = true; miss(); }
-      });
-
-      chart.forEach(n => {
-        if (n.type !== 'hold' || n.done) return;
-
-        if (!n.headHit && isHoldHeadLate(n, t)) { n.done = true; miss(); return; }
-
-        if (n.headHit && !n.failed && t < n.end - (HOLD_DROP_GRACE_MS/1000)) {
-          if (!lanePressed[n.lane]) { n.failed = true; miss(); }
-        }
-
-        if (t >= n.end && !n.done) {
-          const laneX = n.lane * laneWidth + laneWidth / 2;
-          const judgeY = getJudgeLineYInternal();
-          const color = holdStrokeColor(n.lane);
-          if (n.headHit && !n.failed && lanePressed[n.lane]) {
-            awardHoldTail((t - n.end) * 1000);
-            spawnRing(laneX, judgeY, color);
-            vibrate(25);
-          } else {
-            miss();
-          }
-          n.done = true;
-        }
-      });
+    function update(t, dt) {
+      chart.forEach(n => { n.y = noteYAtTimeFor(n.t, t); });
+      chart.forEach(n => { if (!n.hit && isTapMiss(n, t)) { n.hit = true; miss(); } });
+      for (let i=0;i<4;i++) receptorPulse[i] = Math.max(0, receptorPulse[i] - dt*3.2);
+      for (let i = hitFx.length-1; i>=0; i--) if (t - hitFx[i].t0 > hitFx[i].life) hitFx.splice(i,1);
     }
 
-    function laneFillColor(l){ return ['#b266ff', '#66ccff', '#66ff66', '#ff6666'][l]; }
-    function holdStrokeColor(l){ return ['#8e3fff','#2da6e6','#2dcf2d','#e63a3a'][l]; }
-
-    function render() {
+    function render({skipNotes=false} = {}) {
       const judge = getJudgeLineYInternal();
       ctx.clearRect(0, 0, W, H);
 
-      const tNow = (performance.now() - startTime)/1000;
-
-      // 先畫 hold（底層）
-      chart.forEach(n => {
-        if (n.type !== 'hold' || n.done) return;
-        const x = n.lane * laneWidth + laneWidth / 2;
-        const yHead = noteYAtTimeFor(n.t, tNow);
-        const yTail = noteYAtTimeFor(n.end, tNow);
-        const pressed = lanePressed[n.lane] && n.headHit && !n.failed;
-        drawHoldCapsule(x, yHead, yTail, laneFillColor(n.lane), holdStrokeColor(n.lane), pressed);
-      });
-
-      // 再畫 tap（上層圓）
-      chart.forEach(n => {
-        if (n.type !== 'tap' || n.hit) return;
-        const x = n.lane * laneWidth + laneWidth / 2;
-        ctx.fillStyle = laneFillColor(n.lane);
-        ctx.beginPath();
-        ctx.arc(x, n.y, NOTE_RADIUS, 0, Math.PI * 2);
-        ctx.fill();
-      });
-
-      // 判定線區域的 lane 光條（按住/按下時）
-      for (let l=0; l<4; l++){
-        if (!lanePressed[l]) continue;
-        const x = l * laneWidth + laneWidth / 2;
-        const glowW = NOTE_RADIUS * 2.4;
-        const glowH = 16;
-        ctx.save();
-        ctx.globalAlpha = 0.28;
-        ctx.fillStyle = laneFillColor(l);
-        ctx.fillRect(x - glowW/2, judge - glowH/2, glowW, glowH);
-        ctx.restore();
+      // receptor（倒數也畫）
+      for (let lane=0; lane<4; lane++){
+        const x = lane * laneWidth + laneWidth / 2;
+        const pulse = receptorPulse[lane];
+        const glowScale = 1 + 0.18 * pulse;
+        drawArrow(x, judge, NOTE_BASE * glowScale, laneDirs[lane], laneColors[lane], 0.8 + pulse);
       }
 
-      // 前景：打擊特效
-      renderFX();
+      // 音符（倒數時不畫，避免誤解正在開始）
+      if (!skipNotes) {
+        chart.forEach(n => {
+          if (n.hit) return;
+          const x = n.lane * laneWidth + laneWidth / 2;
+          drawArrow(x, n.y, NOTE_BASE, laneDirs[n.lane], laneColors[n.lane], 0.6);
+        });
+      }
 
-      // 判定字樣
+      hitFx.forEach(fx=>{
+        const x = fx.lane * laneWidth + laneWidth / 2;
+        const p = Math.min(1, (nowT - fx.t0) / fx.life);
+        drawRing(x, judge, 18 + 80*p, 1 - p);
+      });
+
       if (lastJudgementText !== '-') {
         ctx.fillStyle = '#fff';
         ctx.font = 'bold 32px sans-serif';
@@ -674,15 +589,18 @@
 
     function loop(ts) {
       if (paused) return;
-      const t = (ts - startTime) / 1000;
-      update(t);
+      if (!prevTs) prevTs = ts;
+      nowT = (ts - startTime) / 1000;
+      const dt = Math.max(0, (ts - prevTs) / 1000);
+      prevTs = ts;
+
+      update(nowT, dt);
       render();
 
-      if (chart.every(isConsumed)) {
+      if (chart.every(n => n.hit)) {
         running = false;
         lastJudgementText = 'END';
         updateHUD();
-
         document.getElementById('finalSong').textContent = currentSongTitle;
         document.getElementById('finalDiff').textContent = currentDifficulty.toUpperCase();
         document.getElementById('finalDir').textContent  = (currentDirection === 'up' ? '上升' : '下落');
@@ -695,118 +613,128 @@
         document.getElementById('statMiss').textContent = stats.miss;
 
         showOnly('endScreen');
+        phase = 'menu';
         return;
       }
 
       loopId = requestAnimationFrame(loop);
     }
+    function stopGameLoop(){ try{ cancelAnimationFrame(loopId); }catch{} loopId=null; prevTs=0; }
 
-    /* ====== 輸入 ====== */
+    /* ====== 倒數處理（可中止） ====== */
+    function showCountdown(startCallback) {
+      cancelCountdown();                 // 確保乾淨
+      isCountingDown = true;
+      phase = 'countdown';
+
+      // 倒數時先顯示 receptor（不畫音符）
+      const countdownLoop = () => {
+        if (!isCountingDown) return;
+        render({skipNotes:true});
+        countdownRAF = requestAnimationFrame(countdownLoop);
+      };
+      countdownLoop();
+
+      const el = document.getElementById('countdownText');
+      el.style.display = 'block';
+      const steps = ['Ready', '3', '2', '1', 'Go!'];
+      const stepDur = 700;
+
+      const playStep = (i) => {
+        if (!isCountingDown) return;
+        el.textContent = steps[i];
+        // 無閃爍：只做縮放動畫
+        el.style.animation = 'none';
+        // 觸發一次重排以重啟動畫
+        void el.offsetWidth;
+        el.style.animation = 'popScale .55s ease-out';
+      };
+
+      // 逐步排程
+      for (let i=0;i<steps.length;i++){
+        countdownTimers.push(setTimeout(()=>playStep(i), i*stepDur));
+      }
+      // 結束後啟動遊戲
+      countdownTimers.push(setTimeout(()=>{
+        if (!isCountingDown) return;
+        el.style.display = 'none';
+        isCountingDown = false;
+        cancelAnimationFrame(countdownRAF);
+        startCallback();                 // 真正開始
+      }, steps.length*stepDur));
+    }
+
+    function cancelCountdown() {
+      if (!isCountingDown && countdownTimers.length===0 && !countdownRAF) return;
+      isCountingDown = false;
+      countdownTimers.forEach(id=>clearTimeout(id));
+      countdownTimers = [];
+      try{ cancelAnimationFrame(countdownRAF); }catch{}
+      countdownRAF = null;
+      const el = document.getElementById('countdownText');
+      el.style.animation = 'none';
+      el.style.display = 'none';
+    }
+
+    function stopAndResetBgm(){
+      try { bgm.pause(); } catch {}
+      try { bgm.currentTime = 0; } catch {}
+    }
+
+    /* ====== 輸入（鍵盤＋觸控） ====== */
     window.addEventListener('keydown', e => {
       const k = e.key.toLowerCase();
-      if (k in keyToLane) {
-        const lane = keyToLane[k];
-        if (!lanePressed[lane]) { lanePressed[lane] = true; onLanePress(lane); }
-        e.preventDefault();
-      }
-      if (e.key === 'Escape') { paused ? resumeGame() : pauseGame(); }
-    });
-    window.addEventListener('keyup', e => {
-      const k = e.key.toLowerCase();
-      if (k in keyToLane) { lanePressed[keyToLane[k]] = false; e.preventDefault(); }
-    });
 
-    ['d','f','j','k'].forEach((k, lane) => {
-      const el = document.getElementById('key-' + k);
-      el.addEventListener('pointerdown', (e) => { e.preventDefault(); lanePointers[lane].add(e.pointerId); lanePressed[lane] = true; onLanePress(lane); vibrate(10); }, { passive:false });
-      const up = (e) => { lanePointers[lane].delete(e.pointerId); if (lanePointers[lane].size===0) lanePressed[lane]=false; };
-      el.addEventListener('pointerup', up); el.addEventListener('pointercancel', up); el.addEventListener('pointerout', up);
+      if (k in keyToLane) {
+        // 倒數時禁止打鍵（僅展示 receptor）
+        if (phase === 'playing') onLanePress(keyToLane[k]);
+        e.preventDefault();
+        return;
+      }
+
+      if (e.key === 'Escape') {
+        if (phase === 'countdown') {        // << 修復：倒數中 ESC 直接回主選單且停歌
+          cancelCountdown();
+          goToMenu();
+          return;
+        }
+        if (phase === 'playing') { paused ? resumeGame() : pauseGame(); return; }
+        if (phase === 'paused')  { resumeGame(); return; }
+      }
     });
 
     canvas.addEventListener('pointerdown', (e) => {
+      if (phase !== 'playing') return;      // 倒數時不處理點擊
       e.preventDefault();
       const rect = getCanvasRect();
       const x = e.clientX - rect.left;
       const cssLaneWidth = rect.width / 4;
       const lane = Math.min(3, Math.max(0, Math.floor(x / cssLaneWidth)));
-      lanePointers[lane].add(e.pointerId);
-      lanePressed[lane] = true;
       onLanePress(lane);
-      vibrate(10);
     }, { passive:false });
-    const upFromCanvas = (e) => {
-      for (let lane=0; lane<4; lane++) {
-        if (lanePointers[lane].has(e.pointerId)) {
-          lanePointers[lane].delete(e.pointerId);
-          if (lanePointers[lane].size===0) lanePressed[lane]=false;
-          break;
-        }
-      }
-    };
-    canvas.addEventListener('pointerup', upFromCanvas);
-    canvas.addEventListener('pointercancel', upFromCanvas);
 
     function onLanePress(lane) {
       if (!running) return;
       const tNow = (performance.now() - startTime) / 1000;
-      const xLane = lane * laneWidth + laneWidth / 2;
-      const judgeY = getJudgeLineYInternal();
-      const color = holdStrokeColor(lane);
 
-      // 1) 優先找 hold 頭
-      let bestHold = null, bestAbs = Infinity;
-      for (const n of chart) {
-        if (n.type !== 'hold' || n.done || n.lane !== lane || n.headHit) continue;
-        const dtMs = (tNow - n.t) * 1000;
-        const adt = Math.abs(dtMs);
-        if (adt <= TOUCH_WINDOW_MS && adt < bestAbs) { bestAbs = adt; bestHold = n; }
-      }
-      if (bestHold) {
-        judge((tNow - bestHold.t) * 1000);
-        bestHold.headHit = true;
-        spawnRing(xLane, judgeY, color); // 頭命中特效
-        flashKeyByLane(lane);
-        vibrate(25);
-        return;
-      }
-
-      // 2) 其次找 tap
-      let bestTapIdx = -1; bestAbs = Infinity;
-      for (let i=0;i<chart.length;i++) {
+      let bestIdx = -1, bestAbs = Infinity;
+      for (let i = 0; i < chart.length; i++) {
         const n = chart[i];
-        if (n.type !== 'tap' || n.hit || n.lane !== lane) continue;
+        if (n.hit || n.lane !== lane) continue;
         const dtMs = (tNow - n.t) * 1000;
         const adt = Math.abs(dtMs);
-        if (adt <= TOUCH_WINDOW_MS && adt < bestAbs) { bestAbs = adt; bestTapIdx = i; }
+        if (adt <= TOUCH_WINDOW_MS && adt < bestAbs) { bestAbs = adt; bestIdx = i; }
       }
-      if (bestTapIdx >= 0) {
-        const n = chart[bestTapIdx];
-        judge((tNow - n.t) * 1000);
+
+      if (bestIdx >= 0) {
+        const n = chart[bestIdx];
+        judge((tNow - n.t) * 1000, lane);
         n.hit = true;
-        spawnRing(xLane, judgeY, color); // 單點特效
         flashKeyByLane(lane);
-        vibrate(15);
-        return;
+      } else {
+        if (currentJudgeMode === 'old') ghostTap(lane);
+        flashKeyByLane(lane);
       }
-
-      if (currentJudgeMode === 'old') ghostTap();
-      flashKeyByLane(lane);
-    }
-
-    /* ====== 倒數 ====== */
-    function showCountdown(callback) {
-      const countdownText = document.getElementById('countdownText');
-      const steps = ['Ready', '3', '2', '1', 'Go!'];
-      let i = 0;
-      function nextStep() {
-        if (i >= steps.length) { countdownText.style.display = 'none'; callback(); return; }
-        countdownText.textContent = steps[i];
-        countdownText.style.display = 'block';
-        countdownText.classList.remove('countdown'); void countdownText.offsetWidth;
-        countdownText.classList.add('countdown');
-        i++; setTimeout(nextStep, 700);
-      }
-      nextStep();
     }
 
     /* ====== 流程 ====== */
@@ -829,12 +757,14 @@
 
       document.body.classList.toggle('ex-mode', difficulty === 'ex');
 
-      try { bgm.pause(); } catch {}
-      try { cancelAnimationFrame(loopId); } catch {}
+      // 重置狀態
+      stopGameLoop();
       score = 0; combo = 0; lastJudgementText = '-'; comboFlash = '';
       chart = []; paused = false; running = true; missCount = 0; gameOver = false;
       stats = { sick:0, good:0, bad:0, shit:0, miss:0 };
-      elapsedTimeBeforePause = 0;
+      elapsedTimeBeforePause = 0; nowT = 0; prevTs = 0;
+      for (let i=0;i<4;i++) receptorPulse[i]=0;
+      hitFx.length = 0;
       updateHUD();
 
       currentSongTitle = selectedSongFile.replace(/\.mp3$/i, '');
@@ -842,6 +772,7 @@
       bgm.src = url; bgm.load();
 
       showOnly('gameScreen');
+      phase = 'countdown';
 
       applyDesktopScale();
       requestAnimationFrame(updateHitbarPosition);
@@ -859,19 +790,28 @@
         chartFinalized = true;
       };
 
+      // 倒數（顯示 receptor、不顯示音符；可中止）
       showCountdown(() => {
+        if (phase !== 'countdown') return;  // 若被中止就不啟動
+        phase = 'playing';
         startTime = performance.now();
-        bgm.currentTime = 0;
-        bgm.play().catch(()=>{});
+        try { bgm.currentTime = 0; bgm.play().catch(()=>{}); } catch {}
         loopId = requestAnimationFrame(loop);
       });
     }
 
     function pauseGame() {
+      if (phase === 'countdown') {
+        // 倒數時按暫停鍵：直接視為取消回主選單
+        cancelCountdown();
+        goToMenu();
+        return;
+      }
       if (!running || paused) return;
       paused = true;
+      phase = 'paused';
       try { bgm.pause(); } catch {}
-      try { cancelAnimationFrame(loopId); } catch {}
+      stopGameLoop();
       elapsedTimeBeforePause = (performance.now() - startTime) / 1000;
       document.getElementById('gameScreen').classList.add('blur');
       showOnly('pauseScreen');
@@ -880,22 +820,27 @@
     function resumeGame() {
       if (!paused) return;
       paused = false;
+      phase = 'playing';
       showOnly('gameScreen');
       document.getElementById('gameScreen').classList.remove('blur');
 
       applyDesktopScale();
       requestAnimationFrame(updateHitbarPosition);
 
-      showCountdown(() => {
-        startTime = performance.now() - (elapsedTimeBeforePause * 1000);
-        bgm.play().catch(()=>{});
-        loopId = requestAnimationFrame(loop);
-      });
+      startTime = performance.now() - (elapsedTimeBeforePause * 1000);
+      try { bgm.play().catch(()=>{}); } catch {}
+      loopId = requestAnimationFrame(loop);
     }
 
     /* ====== 初始化 ====== */
+    function renderIdle() {
+      // 在主選單/選項/音樂頁也能維持舞台比例運算
+      if (document.getElementById('gameScreen').style.display === 'block') return;
+      updateHitbarPosition();
+    }
+
     applyDesktopScale();
-    window.addEventListener('resize', applyDesktopScale, { passive: true });
+    window.addEventListener('resize', () => { applyDesktopScale(); renderIdle(); }, { passive: true });
     window.addEventListener('scroll', updateHitbarPosition, { passive: true });
     if (window.visualViewport) {
       ['resize','scroll'].forEach(ev => {
@@ -903,6 +848,7 @@
       });
     }
 
+    // 禁右鍵 / 禁縮放
     document.addEventListener("contextmenu", e => e.preventDefault());
     document.addEventListener('gesturestart', e => e.preventDefault());
     document.addEventListener('dblclick', e => e.preventDefault());
@@ -911,8 +857,6 @@
   </script>
 </body>
 </html>
-
-
 
 
 
