@@ -73,6 +73,13 @@
     /* 音樂選單 */
     #songSelect { width: 90%; max-width: 420px; height: 280px; }
     #musicScreen .hint { opacity: .8; font-size: 14px; margin-top: 6px; }
+
+    /* 小型提示橫幅 */
+    #warnBanner {
+      position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%);
+      background: rgba(255,80,80,.95); padding: 10px 14px; border-radius: 8px; font-size: 14px;
+      display: none; z-index: 20;
+    }
   </style>
 </head>
 <body>
@@ -149,11 +156,11 @@
       </select>
     </div>
 
-    <!-- 音量控制 -->
+    <!-- 音量 -->
     <div class="row">
       <label for="volumeSlider">音量：</label>
-      <input id="volumeSlider" type="range" min="0" max="1" step="0.01" value="0.6" oninput="updateVolumeFromUI(this.value)" />
-      <span id="volumeLabel">60%</span>
+      <input id="volumeSlider" type="range" min="0" max="100" value="80" />
+      <span id="volumeLabel">80%</span>
     </div>
 
     <div class="row">
@@ -213,15 +220,16 @@
 
   <div id="countdownText" style="display:none;"></div>
 
-  <audio id="hitSound" src="https://cdn.pixabay.com/download/audio/2022/03/15/audio_6e3e3b6f3f.mp3?filename=click-124467.mp3"></audio>
+  <div id="warnBanner">⚠️ 音樂無法播放：請確認檔名/路徑，或點一下畫面再按開始。</div>
+
+  <!-- 音效：鏘聲（命中與空打都會播放） -->
+  <audio id="hitSound" src="https://cdn.pixabay.com/download/audio/2022/03/15/audio_6e3e3b6f3f.mp3?filename=click-124467.mp3" preload="auto"></audio>
   <audio id="bgm" preload="auto"></audio>
 
   <script>
     /* ========= 參數 ========= */
     const canvas = document.getElementById('gameCanvas');
     const ctx = canvas.getContext('2d', { alpha: false, desynchronized: true });
-    ctx.lineJoin = 'round';
-    ctx.lineCap  = 'round';
 
     // 內部遊戲座標（固定 420x640）
     const W = canvas.width, H = canvas.height;
@@ -304,14 +312,18 @@
 
     // 遊戲狀態
     const keys = ['d','f','j','k'];
-    const keyToLane = { d:0, f:1, j:2, k:3 };
-    // 方向鍵也能觸發
-    keyToLane.arrowleft  = 0;
-    keyToLane.arrowdown  = 1;
-    keyToLane.arrowup    = 2;
-    keyToLane.arrowright = 3;
-
     const laneDirs = ['left','down','up','right'];
+
+    // 支援 DFJK + 方向鍵
+    function laneFromKey(k) {
+      switch (k) {
+        case 'd': case 'arrowleft':  return 0;
+        case 'f': case 'arrowdown':  return 1;
+        case 'j': case 'arrowup':    return 2;
+        case 'k': case 'arrowright': return 3;
+        default: return null;
+      }
+    }
 
     let score = 0, combo = 0, lastJudgementText = '-';
     let startTime = 0, running = false, paused = false, loopId = null;
@@ -325,12 +337,12 @@
     let baseNoteSpeed = 550;
     let noteSpeed = baseNoteSpeed;
 
-    /* —— 擴大判定（時間 + 物理） —— */
-    const FNF_WINDOWS = { sick: 85, good: 140, bad: 170, shit: 210 };
+    // 擴大判定窗（原本 sick 70/good118/bad123/shit138）
+    const FNF_WINDOWS = { sick: 80, good: 130, bad: 150, shit: 170 };
     const FNF_SCORES  = { sick: 350, good: 200, bad: 100, shit: -50, miss: -300, ghost: -150 };
-    const MISS_Y_OFFSET = 60;            // ↑ 擴大判定線附近的「物理」容忍距離
-    const TOUCH_WINDOW_MS = FNF_WINDOWS.shit; // ↑ 點擊挑選目標音符的時間窗
-    const LATE_MISS_GRACE_MS = 220;      // ↑ 遲到 Miss 緩衝
+    const MISS_Y_OFFSET = 40;
+    const TOUCH_WINDOW_MS = FNF_WINDOWS.shit;
+    const LATE_MISS_GRACE_MS = 160;
 
     // 統計
     let missCount = 0;
@@ -345,20 +357,6 @@
 
     // 音樂選擇（必選）
     let selectedSongFile = null;
-
-    // 音量
-    const DEFAULT_VOLUME = parseFloat(localStorage.getItem('dfjk_volume')) || 0.6;
-    function applyVolume(v){
-      const vol = Math.max(0, Math.min(1, parseFloat(v)));
-      bgm.volume = vol;
-      hitSound.volume = Math.min(1, vol * 0.9);
-      const lab = document.getElementById('volumeLabel');
-      if (lab) lab.textContent = `${Math.round(vol*100)}%`;
-      const slider = document.getElementById('volumeSlider');
-      if (slider && slider.value !== String(vol)) slider.value = vol;
-      localStorage.setItem('dfjk_volume', String(vol));
-    }
-    function updateVolumeFromUI(v){ applyVolume(v); }
 
     // 曲庫（請確保 /music 檔名一致）
     const SONGS = [
@@ -383,9 +381,7 @@
       "ロクデナシ「ただ聲一つ」_ Rokudenashi - One Voice【Official Music Video】 - ロクデナシ _ Rokudenashi.mp3",
       "好きだから。_ 『ユイカ』【MV】 - 『ユイカ』.mp3",
       "廻廻奇譚 - Eve MV - Eve.mp3",
-      "青のすみか _ キタニタツヤ - Where Our Blue Is _ Tatsuya Kitani - キタニタツヤ _ Tatsuya Kitani.mp3",
-      "Toge Toge Sadistic - Enormita (youtube).mp3",
-      "My dream girls - NACHERRY (youtube).mp3"
+      "青のすみか _ キタニタツヤ - Where Our Blue Is _ Tatsuya Kitani - キタニタツヤ _ Tatsuya Kitani.mp3"
     ];
 
     /* ====== 畫面切換 ====== */
@@ -493,12 +489,11 @@
         ctx.lineWidth = 6; ctx.strokeStyle = strokeStyle; ctx.stroke();
         ctx.restore();
       };
-      /* 兩層（外+內），移除黑邊修補額外筆劃 */
       drawShape(1.0, 'gradient', '#000000', 16*glow);
       drawShape(innerScale, 'gradient', colorLerp(baseColor,'#ffffff',0.25), 6*glow);
     }
     function drawRing(x,y,r,alpha){
-      if (__quality === 'LQ') return;
+      if (__useLowQuality) return;
       ctx.save(); ctx.globalAlpha = alpha;
       ctx.beginPath(); ctx.arc(x,y,r,0,Math.PI*2);
       ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 3; ctx.stroke();
@@ -506,7 +501,7 @@
     }
     function flashKeyByLane(laneIdx) { receptorPulse[laneIdx] = 1; }
 
-    /* === Sprite: 預渲染箭頭/接收器，並修正 DPR 對齊 === */
+    /* === Sprite: 預渲染箭頭/接收器（避免偶發黑邊消失抖動） === */
     function drawArrowTo(ct, x, y, size, dir, baseColor, glow = 1, innerScale = 0.7){
       const angle = dirToAngle(dir);
       const Hh = size * 1.15, Wd = size, headH = Hh * 0.55;
@@ -527,10 +522,9 @@
         grad.addColorStop(0.25, colorLerp('#ffffff', baseColor, .2));
         grad.addColorStop(1, baseColor);
         ct.fillStyle = grad; ct.fill();
-        ct.lineWidth = 6; ct.strokeStyle = strokeStyle; ct.stroke();
+        ct.lineWidth = 6; ct.strokeStyle = '#000'; ct.stroke();
         ct.restore();
       };
-      /* 兩層（外+內），移除黑邊修補額外筆劃 */
       drawShape(1.0, 'gradient', '#000000', 16*glow);
       drawShape(innerScale, 'gradient', colorLerp(baseColor,'#ffffff',0.25), 6*glow);
     }
@@ -543,8 +537,6 @@
       off.width = off.height = pad*2*dpr;
       const octx = off.getContext('2d', { alpha:true });
       octx.scale(dpr, dpr);
-      octx.lineJoin = 'round';
-      octx.lineCap  = 'round';
       if (opts.low){
         const angle = dirToAngle(dir);
         const Hh = size * 1.15, Wd = size, headH = Hh * 0.55;
@@ -587,8 +579,7 @@
 
     /* === Perf: FPS monitor & remain counter === */
     let __fpsMA = 60, __fpsFrames = 0, __fpsLastTs = 0;
-    let __quality = 'HQ';   // 'HQ' | 'LQ'
-    let __qLockUntil = 0;   // 切換冷卻時間戳
+    let __useLowQuality = false;
     let __remainNotes = 0;
 
     function __trackFPS(ts){
@@ -599,16 +590,8 @@
         const inst = __fpsFrames * 1000 / span;
         __fpsMA = __fpsMA * 0.8 + inst * 0.2;
         __fpsFrames = 0; __fpsLastTs = ts;
-      }
-    }
-    function __maybeSwitchQuality(ts){
-      if (ts < __qLockUntil) return;
-      if (__quality === 'HQ' && __fpsMA < 53) {
-        __quality = 'LQ';
-        __qLockUntil = ts + 1500;
-      } else if (__quality === 'LQ' && __fpsMA > 59) {
-        __quality = 'HQ';
-        __qLockUntil = ts + 1500;
+        if (__fpsMA < 54) __useLowQuality = true;
+        else if (__fpsMA > 58) __useLowQuality = false;
       }
     }
 
@@ -626,8 +609,10 @@
       receptorPulse[lane] = 1;
       hitFx.push({lane, t0: nowT, life: 0.25});
       updateHUD();
-      try{ hitSound.currentTime = 0; hitSound.play(); }catch{}
-      if (combo > 0 && combo % 10 === 0) { comboFlash = `COMBO x${combo}!!`; setTimeout(() => comboFlash = '', 800); }
+      if (combo > 0 && combo % 10 === 0) {
+        comboFlash = `COMBO x${combo}!!`;
+        setTimeout(() => comboFlash = '', 800);
+      }
     }
     function miss() {
       lastJudgementText = 'MISS';
@@ -636,7 +621,11 @@
       updateHUD();
       if (currentDifficulty === 'ex' && missCount > 15) triggerFailOnce('你輸了！EX 模式 MISS 超過 15 次');
     }
-    function ghostTap(lane) { lastJudgementText='MISS'; combo=0; score=Math.max(0, score+FNF_SCORES.ghost); receptorPulse[lane]=0.5; updateHUD(); }
+    function ghostTap(lane) {
+      lastJudgementText='MISS'; combo=0;
+      score=Math.max(0, score+FNF_SCORES.ghost);
+      receptorPulse[lane]=0.5; updateHUD();
+    }
     function triggerFailOnce(msg) {
       if (gameOver) return; gameOver = true; running = false;
       stopGameLoop(); stopAndResetBgm();
@@ -757,7 +746,7 @@
       ctx.clearRect(0, 0, W, H);
 
       // receptor
-      const _rec = (__quality === 'LQ') ? __SPR.recLQ : __SPR.recHQ;
+      const _rec = __useLowQuality ? __SPR.recLQ : __SPR.recHQ;
       for (let lane=0; lane<4; lane++){
         const x = lane * laneWidth + laneWidth / 2;
         const pulse = receptorPulse[lane];
@@ -767,7 +756,7 @@
 
       // notes（視窗裁剪）
       if (!skipNotes) {
-        const _note = (__quality === 'LQ') ? __SPR.noteLQ : __SPR.noteHQ;
+        const _note = __useLowQuality ? __SPR.noteLQ : __SPR.noteHQ;
         const top = -120, bottom = H + 120;
         for (let i=0;i<chart.length;i++){
           const n = chart[i];
@@ -803,6 +792,29 @@
       }
     }
 
+    // 在指定時間 t 預覽場上音符（不改變任何狀態、不判定、不計 MISS）
+    function renderPreviewAt(t) {
+      const judge = getJudgeLineYInternal();
+      ctx.clearRect(0, 0, W, H);
+
+      const _rec = __useLowQuality ? __SPR.recLQ : __SPR.recHQ;
+      for (let lane = 0; lane < 4; lane++) {
+        const x = lane * laneWidth + laneWidth / 2;
+        __drawSprite(_rec[lane], x, judge, 1);
+      }
+
+      const _note = __useLowQuality ? __SPR.noteLQ : __SPR.noteHQ;
+      const top = -120, bottom = H + 120;
+      for (let i = 0; i < chart.length; i++) {
+        const n = chart[i];
+        if (n.hit) continue;
+        const y = noteYAtTimeFor(n.t, t);
+        if (y < top || y > bottom) continue;
+        const x = n.lane * laneWidth + laneWidth / 2;
+        __drawSprite(_note[n.lane], x, y, 1);
+      }
+    }
+
     function endGameAndShowResult(){
       running = false;
       lastJudgementText = 'END';
@@ -823,22 +835,6 @@
 
     let songEnded = false;
 
-    // 音樂未播放提醒（自動檢測）
-    function showPlayWarning(){
-      alert('偵測到音樂沒有播放。\n請點擊畫面一次或解除瀏覽器靜音／省電模式，再按「繼續」。');
-    }
-    function guardAudioPlayback(){
-      const t0 = bgm.currentTime || 0;
-      setTimeout(() => {
-        if (phase === 'playing' && (bgm.paused || (bgm.currentTime || 0) <= t0 + 0.01)) {
-          showPlayWarning();
-        }
-      }, 1200);
-    }
-    bgm.addEventListener('error', showPlayWarning);
-    bgm.addEventListener('stalled', showPlayWarning);
-    bgm.addEventListener('suspend', () => {});
-
     function loop(ts) {
       if (paused) return;
       if (!prevTs) { prevTs = ts; __lastRenderTs = ts; }
@@ -848,7 +844,6 @@
 
       update(nowT, dt);
       __trackFPS(ts);
-      __maybeSwitchQuality(ts);
 
       // 手機穩定 60fps 的視覺節奏鎖（不影響判定時間）
       let doRender = true;
@@ -871,16 +866,20 @@
     }
     function stopGameLoop(){ try{ cancelAnimationFrame(loopId); }catch{} loopId=null; prevTs=0; }
 
-    /* ====== 倒數處理（可中止） ====== */
-    function showCountdown(startCallback) {
+    /* ====== 倒數處理（可中止 + 可預覽） ====== */
+    function showCountdown(startCallback, opts) {
       cancelCountdown();
       isCountingDown = true;
       phase = 'countdown';
 
-      // 倒數時先顯示 receptor（不畫音符）
+      // 可選：opts = { showNotes: true, previewTime: <number 秒> }
+      const previewTime = opts && typeof opts.previewTime === 'number' ? opts.previewTime : null;
+      const showNotes = !!(opts && opts.showNotes && previewTime !== null);
+
       const countdownLoop = () => {
         if (!isCountingDown) return;
-        render({skipNotes:true});
+        if (showNotes) { renderPreviewAt(previewTime); }
+        else { render({skipNotes:true}); }
         countdownRAF = requestAnimationFrame(countdownLoop);
       };
       countdownLoop();
@@ -925,14 +924,65 @@
     function stopAndResetBgm(){
       try { bgm.pause(); } catch {}
       try { bgm.currentTime = 0; } catch {}
+      stopPlayGuard();
+    }
+
+    /* ====== 音效/音量/播放守護 ====== */
+    const warnBanner = document.getElementById('warnBanner');
+    let audioWarned = false;
+    let _playGuardTimer = null;
+
+    function setVolumes(percent){
+      const v = Math.max(0, Math.min(100, percent)) / 100;
+      bgm.volume = v;
+      hitSound.volume = Math.min(1, v * 0.9); // 鏘聲略小
+    }
+    function initVolumeUI(){
+      const slider = document.getElementById('volumeSlider');
+      const label  = document.getElementById('volumeLabel');
+      const saved = +localStorage.getItem('dfjk.volume') || 80;
+      slider.value = String(saved);
+      label.textContent = `${saved}%`;
+      setVolumes(saved);
+      slider.addEventListener('input', ()=>{
+        const val = +slider.value;
+        label.textContent = `${val}%`;
+        setVolumes(val);
+        localStorage.setItem('dfjk.volume', String(val));
+      });
+    }
+
+    function playTapSound(){
+      try { hitSound.currentTime = 0; hitSound.play().catch(()=>{}); } catch {}
+    }
+
+    function showPlayWarning(msg){
+      if (audioWarned) return;
+      audioWarned = true;
+      warnBanner.textContent = msg || '⚠️ 音樂無法播放：請確認檔名/路徑，或點一下畫面再按開始。';
+      warnBanner.style.display = 'block';
+      setTimeout(()=>{ warnBanner.style.display = 'none'; audioWarned=false; }, 3000);
+    }
+
+    function guardAudioPlayback(){
+      stopPlayGuard();
+      const t0 = bgm.currentTime;
+      _playGuardTimer = setTimeout(()=>{
+        const advanced = bgm.currentTime > t0 + 0.05;
+        if (bgm.paused || !advanced) showPlayWarning();
+      }, 1500);
+    }
+    function stopPlayGuard(){
+      if (_playGuardTimer){ clearTimeout(_playGuardTimer); _playGuardTimer = null; }
     }
 
     /* ====== 輸入（鍵盤＋觸控） ====== */
     window.addEventListener('keydown', e => {
       const k = e.key.toLowerCase();
+      const lane = laneFromKey(k);
 
-      if (k in keyToLane) {
-        if (phase === 'playing') onLanePress(keyToLane[k]);
+      if (lane !== null) {
+        if (phase === 'playing') onLanePress(lane);
         e.preventDefault();
         return;
       }
@@ -960,9 +1010,13 @@
 
     function onLanePress(lane) {
       if (!running) return;
-      const tNow = (performance.now() - startTime) / 1000;
 
+      // 鏘聲：命中或空打都要有（統一在這裡播，避免重複）
+      playTapSound();
+
+      const tNow = (performance.now() - startTime) / 1000;
       let bestIdx = -1, bestAbs = Infinity;
+
       for (let i = 0; i < chart.length; i++) {
         const n = chart[i];
         if (n.hit || n.lane !== lane) continue;
@@ -1019,7 +1073,7 @@
 
       // 追蹤音樂結束
       songEnded = false;
-      bgm.onended = () => { songEnded = true; };
+      bgm.onended = () => { songEnded = true; stopPlayGuard(); };
 
       showOnly('gameScreen');
       phase = 'countdown';
@@ -1039,18 +1093,18 @@
         chartFinalized = true;
       };
 
-      // sprites（一次性）
+      // 建立 sprites（一次性）
       __buildSprites();
 
-      // 倒數
+      // 開局倒數（維持原本只顯示 receptor）
       showCountdown(() => {
         if (phase !== 'countdown') return;
         phase = 'playing';
-        freezeLayout();     // 進關即固定幾何，打擊圖示不再漂
+        freezeLayout();     // 進關即固定幾何
         startTime = performance.now();
         try {
           const p = bgm.play();
-          if (p && typeof p.catch === 'function') p.catch(() => showPlayWarning());
+          if (p && typeof p.catch === 'function') p.catch(()=>showPlayWarning());
         } catch {}
         guardAudioPlayback();
         loopId = requestAnimationFrame(loop);
@@ -1067,6 +1121,7 @@
       paused = true;
       phase = 'paused';
       try { bgm.pause(); } catch {}
+      stopPlayGuard();
       stopGameLoop();
       elapsedTimeBeforePause = (performance.now() - startTime) / 1000;
       unfreezeLayout();   // 暫停解除凍結，允許視窗調整
@@ -1074,37 +1129,37 @@
       showOnly('pauseScreen');
     }
 
-   function resumeGame() {
-  if (!paused) return;
-  paused = false;
+    function resumeGame() {
+      if (!paused) return;
+      paused = false;
 
-  // 先回到遊戲畫面，但進入倒數階段，不要立刻播放或跑迴圈
-  showOnly('gameScreen');
-  document.getElementById('gameScreen').classList.remove('blur');
+      // 先回到遊戲畫面，但進入倒數階段，不要立刻播放或跑迴圈
+      showOnly('gameScreen');
+      document.getElementById('gameScreen').classList.remove('blur');
 
-  applyDesktopScale();
-  recomputeLayout();
+      applyDesktopScale();
+      recomputeLayout();
 
-  // 進入倒數模式：只顯示接收器，不更新音符位置與時間
-  phase = 'countdown';
-  showCountdown(() => {
-    // 倒數結束才真正恢復
-    phase = 'playing';
-    freezeLayout(); // 恢復時固定幾何，避免打擊圖示位移
+      // 進入倒數模式：顯示「暫停當下」的譜面預覽
+      phase = 'countdown';
+      showCountdown(() => {
+        // 倒數結束才真正恢復
+        phase = 'playing';
+        freezeLayout(); // 恢復時固定幾何
 
-    // 讓譜面時間點與音樂保持「暫停前」的對齊
-    startTime = performance.now() - (elapsedTimeBeforePause * 1000);
-    __lastRenderTs = 0;
+        // 讓譜面時間點與音樂保持「暫停前」的對齊
+        startTime = performance.now() - (elapsedTimeBeforePause * 1000);
+        __lastRenderTs = 0;
 
-    try {
-      const p = bgm.play();
-      if (p && typeof p.catch === 'function') p.catch(() => showPlayWarning());
-    } catch {}
+        try {
+          const p = bgm.play();
+          if (p && typeof p.catch === 'function') p.catch(() => showPlayWarning());
+        } catch {}
 
-    guardAudioPlayback();
-    loopId = requestAnimationFrame(loop);
-  });
-}
+        guardAudioPlayback();
+        loopId = requestAnimationFrame(loop);
+      }, { showNotes: true, previewTime: elapsedTimeBeforePause });
+    }
 
     /* ====== 初始化 ====== */
     function renderIdle() {
@@ -1121,9 +1176,8 @@
     }
 
     applyDesktopScale();
+    initVolumeUI();
     fillSongList();
-    applyVolume(DEFAULT_VOLUME);
-
     window.addEventListener('resize', onViewportChanged, { passive: true });
     window.addEventListener('scroll', () => { if (!__layoutFrozen && (phase==='playing'||phase==='countdown')) recomputeLayout(); }, { passive: true });
     if (window.visualViewport) {
@@ -1147,4 +1201,5 @@
   </script>
 </body>
 </html>
+
 
