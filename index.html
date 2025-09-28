@@ -73,13 +73,6 @@
     /* 音樂選單 */
     #songSelect { width: 90%; max-width: 420px; height: 280px; }
     #musicScreen .hint { opacity: .8; font-size: 14px; margin-top: 6px; }
-
-    /* 小型提示橫幅 */
-    #warnBanner {
-      position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%);
-      background: rgba(255,80,80,.95); padding: 10px 14px; border-radius: 8px; font-size: 14px;
-      display: none; z-index: 20;
-    }
   </style>
 </head>
 <body>
@@ -156,13 +149,6 @@
       </select>
     </div>
 
-    <!-- 音量 -->
-    <div class="row">
-      <label for="volumeSlider">音量：</label>
-      <input id="volumeSlider" type="range" min="0" max="100" value="80" />
-      <span id="volumeLabel">80%</span>
-    </div>
-
     <div class="row">
       <button onclick="goToMenu()">回主選單</button>
     </div>
@@ -220,11 +206,8 @@
 
   <div id="countdownText" style="display:none;"></div>
 
-  <div id="warnBanner">⚠️ 音樂無法播放：請確認檔名/路徑，或點一下畫面再按開始。</div>
-
-  <!-- 音效：鏘聲（命中與空打都會播放；使用音效池） -->
-  <audio id="hitSound" src="https://cdn.pixabay.com/download/audio/2022/03/15/audio_6e3e3b6f3f.mp3?filename=click-124467.mp3" preload="auto"></audio>
-  <audio id="bgm" preload="auto"></audio>
+  <audio id="hitSound" src="https://cdn.pixabay.com/download/audio/2022/03/15/audio_6e3e3b6f3f.mp3?filename=click-124467.mp3"></audio>
+  <audio id="bgm"></audio>
 
   <script>
     /* ========= 參數 ========= */
@@ -312,18 +295,8 @@
 
     // 遊戲狀態
     const keys = ['d','f','j','k'];
+    const keyToLane = { d:0, f:1, j:2, k:3 };
     const laneDirs = ['left','down','up','right'];
-
-    // 支援 DFJK + 方向鍵
-    function laneFromKey(k) {
-      switch (k) {
-        case 'd': case 'arrowleft':  return 0;
-        case 'f': case 'arrowdown':  return 1;
-        case 'j': case 'arrowup':    return 2;
-        case 'k': case 'arrowright': return 3;
-        default: return null;
-      }
-    }
 
     let score = 0, combo = 0, lastJudgementText = '-';
     let startTime = 0, running = false, paused = false, loopId = null;
@@ -337,12 +310,11 @@
     let baseNoteSpeed = 550;
     let noteSpeed = baseNoteSpeed;
 
-    // 擴大判定窗
-    const FNF_WINDOWS = { sick: 80, good: 130, bad: 150, shit: 170 };
+    const FNF_WINDOWS = { sick: 70, good: 118, bad: 123, shit: 138 };
     const FNF_SCORES  = { sick: 350, good: 200, bad: 100, shit: -50, miss: -300, ghost: -150 };
     const MISS_Y_OFFSET = 40;
     const TOUCH_WINDOW_MS = FNF_WINDOWS.shit;
-    const LATE_MISS_GRACE_MS = 160;
+    const LATE_MISS_GRACE_MS = 120;
 
     // 統計
     let missCount = 0;
@@ -361,10 +333,14 @@
     // 曲庫（請確保 /music 檔名一致）
     const SONGS = [
       "Charlie Puth - Light Switch [Official Music Video] - Charlie Puth.mp3",
+      "Creepy Nuts - オトノケ(Otonoke) 【Official MV】 [Dandandan OP] - Creepy Nuts.mp3",
       "Creepy Nuts ”Mirage” × Anime ”Call of the Night” Collaboration Music Video Opening Theme Song - Creepy Nuts.mp3",
       "Creepy Nuts ”Nemure” × Anime ”Call of the Night” Collaboration Music Video Ending Theme Song - Creepy Nuts (1).mp3",
       "Creepy Nuts｢Bling-Bang-Bang-Born｣ × TV Anime｢マッシュル-MASHLE-｣ Collaboration Music Video #BBBBダンス - Creepy Nuts.mp3",
       "KANA-BOON - Silhouette - KANABOONVEVO.mp3",
+      "Lost Sky - Fearless pt.II (feat. Chris Linton) Trap NCS - Copyright Free Music - NoCopyrightSounds.mp3",
+      "Lost Sky - Vision pt. II (feat. She Is Jules) Future Trap NCS - Copyright Free Music - NoCopyrightSounds.mp3",
+      "Lost Sky - Where We Started (feat. Jex) Melodic Dubstep NCS - Copyright Free Music - NoCopyrightSounds.mp3",
       "Lost Sky, Sara Skinner - Dreams pt. II (feat. Sara Skinner) [NCS Release].mp3",
       "OneRepublic - Nobody (from Kaiju No. 8) [Official Music Video] - OneRepublicVEVO.mp3",
       "YOASOBI「Watch me!」Official Music Video - Ayase _ YOASOBI.mp3",
@@ -372,47 +348,13 @@
       "【AKASAKI】Bunny Girl _ バニーガール（Lyric Video） - AKASAKI (19).mp3",
       "【MV】隙_ゆーり【オリジナル】 - ゆーり🍎🐥〔24〕・yuri (1).mp3",
       "【imase】NIGHT DANCER（MV） - imase.mp3",
+      "【オリジナル樂曲】粛聖!! ロリ神レクイエム☆ _ しぐれうい（9さい）【IOSYS（まろん&D.watt）】 - しぐれうい.mp3",
       "なとり - Overdose - なとり _ natori.mp3",
+      "ロクデナシ「ただ聲一つ」_ Rokudenashi - One Voice【Official Music Video】 - ロクデナシ _ Rokudenashi.mp3",
       "好きだから。_ 『ユイカ』【MV】 - 『ユイカ』.mp3",
       "廻廻奇譚 - Eve MV - Eve.mp3",
-      "青のすみか _ キタニタツヤ - Where Our Blue Is _ Tatsuya Kitani - キタニタツヤ _ Tatsuya Kitani.mp3",
-      "Toge Toge Sadistic - Enormita (youtube).mp3",
-      "My dream girls - NACHERRY (youtube).mp3",
-      "PEACEKEEPER - STEREO DIVE FOUNDATION (youtube).mp3",
-      "米津玄師, 宇多田ヒカル Kenshi Yonezu, Hikaru Utada - JANE DOE - Kenshi Yonezu 米津玄師 (youtube).mp3",
-      "Aimer - Brave Shine - AimerOfficialVEVO (youtube).mp3",
-      "ROSA WALTON x HALLIE COGGINS - I REALLY WANT TO STAY AT YOUR HOUSE (LYRIC) AMV CYBERPUNK EDGERUNNERS - Eternity Music (youtube).mp3",
-      "米津玄師 Kenshi Yonezu - IRIS OUT - Kenshi Yonezu 米津玄師 (youtube).mp3",
-      "《崩壞：星穹鐵道》EP：「使一顆心免於哀傷」 - 崩壞 星穹鐵道 (youtube).mp3",
-      "TruE - Elysia Theme Song by Ling Huang x HOYO-MiX Official English Lyrics [Hi3 HSR Cyrene] - Yxelixi (youtube).mp3"
+      "青のすみか _ キタニタツヤ - Where Our Blue Is _ Tatsuya Kitani - キタニタツヤ _ Tatsuya Kitani.mp3"
     ];
-
-    /* ====== 音效池（讓鏘聲變大聲、可重疊播放） ====== */
-    class TapSoundPool {
-      constructor(src, size = 10) {
-        this.src = src;
-        this.size = size;
-        this.pool = [];
-        this.idx = 0;
-        for (let i = 0; i < size; i++) {
-          const a = new Audio(src);
-          a.preload = 'auto';
-          a.volume = 1.0;
-          this.pool.push(a);
-        }
-      }
-      setVolume(v) {
-        const vol = Math.max(0, Math.min(1, v));
-        for (const a of this.pool) a.volume = vol;
-      }
-      play() {
-        const a = this.pool[this.idx];
-        this.idx = (this.idx + 1) % this.size;
-        try { a.currentTime = 0; a.play().catch(()=>{}); } catch {}
-      }
-    }
-    let tapPool = null;
-    const SFX_GAIN = 1.6; // SFX 增益（在主音量基礎上再放大）
 
     /* ====== 畫面切換 ====== */
     function showOnly(id) {
@@ -531,7 +473,7 @@
     }
     function flashKeyByLane(laneIdx) { receptorPulse[laneIdx] = 1; }
 
-    /* === Sprite: 預渲染箭頭/接收器 === */
+    /* === Sprite: 預渲染箭頭/接收器，並修正 DPR 對齊 === */
     function drawArrowTo(ct, x, y, size, dir, baseColor, glow = 1, innerScale = 0.7){
       const angle = dirToAngle(dir);
       const Hh = size * 1.15, Wd = size, headH = Hh * 0.55;
@@ -552,7 +494,7 @@
         grad.addColorStop(0.25, colorLerp('#ffffff', baseColor, .2));
         grad.addColorStop(1, baseColor);
         ct.fillStyle = grad; ct.fill();
-        ct.lineWidth = 6; ct.strokeStyle = '#000'; ct.stroke();
+        ct.lineWidth = 6; ct.strokeStyle = strokeStyle; ct.stroke();
         ct.restore();
       };
       drawShape(1.0, 'gradient', '#000000', 16*glow);
@@ -581,7 +523,7 @@
         octx.lineTo(-Wd/2, -Hh/2 + headH);
         octx.closePath();
         const grad = octx.createLinearGradient(0, -Hh/2, 0, Hh/2);
-        octx.addColorStop?.call(grad, 0, '#ffffff'); // 保留簡單相容，但不動核心邏輯
+        octx.addHitRegions; // no-op to keep layout (safe)
         grad.addColorStop(0, '#ffffff');
         grad.addColorStop(1, baseColor);
         octx.fillStyle = grad; octx.fill();
@@ -640,10 +582,8 @@
       receptorPulse[lane] = 1;
       hitFx.push({lane, t0: nowT, life: 0.25});
       updateHUD();
-      if (combo > 0 && combo % 10 === 0) {
-        comboFlash = `COMBO x${combo}!!`;
-        setTimeout(() => comboFlash = '', 800);
-      }
+      try{ hitSound.currentTime = 0; hitSound.play(); }catch{}
+      if (combo > 0 && combo % 10 === 0) { comboFlash = `COMBO x${combo}!!`; setTimeout(() => comboFlash = '', 800); }
     }
     function miss() {
       lastJudgementText = 'MISS';
@@ -652,11 +592,7 @@
       updateHUD();
       if (currentDifficulty === 'ex' && missCount > 15) triggerFailOnce('你輸了！EX 模式 MISS 超過 15 次');
     }
-    function ghostTap(lane) {
-      lastJudgementText='MISS'; combo=0;
-      score=Math.max(0, score+FNF_SCORES.ghost);
-      receptorPulse[lane]=0.5; updateHUD();
-    }
+    function ghostTap(lane) { lastJudgementText='MISS'; combo=0; score=Math.max(0, score+FNF_SCORES.ghost); receptorPulse[lane]=0.5; updateHUD(); }
     function triggerFailOnce(msg) {
       if (gameOver) return; gameOver = true; running = false;
       stopGameLoop(); stopAndResetBgm();
@@ -823,29 +759,6 @@
       }
     }
 
-    // 在指定時間 t 預覽場上音符（不改變任何狀態、不判定、不計 MISS）
-    function renderPreviewAt(t) {
-      const judge = getJudgeLineYInternal();
-      ctx.clearRect(0, 0, W, H);
-
-      const _rec = __useLowQuality ? __SPR.recLQ : __SPR.recHQ;
-      for (let lane = 0; lane < 4; lane++) {
-        const x = lane * laneWidth + laneWidth / 2;
-        __drawSprite(_rec[lane], x, judge, 1);
-      }
-
-      const _note = __useLowQuality ? __SPR.noteLQ : __SPR.noteHQ;
-      const top = -120, bottom = H + 120;
-      for (let i = 0; i < chart.length; i++) {
-        const n = chart[i];
-        if (n.hit) continue;
-        const y = noteYAtTimeFor(n.t, t);
-        if (y < top || y > bottom) continue;
-        const x = n.lane * laneWidth + laneWidth / 2;
-        __drawSprite(_note[n.lane], x, y, 1);
-      }
-    }
-
     function endGameAndShowResult(){
       running = false;
       lastJudgementText = 'END';
@@ -897,20 +810,16 @@
     }
     function stopGameLoop(){ try{ cancelAnimationFrame(loopId); }catch{} loopId=null; prevTs=0; }
 
-    /* ====== 倒數處理（可中止 + 可預覽） ====== */
-    function showCountdown(startCallback, opts) {
+    /* ====== 倒數處理（可中止） ====== */
+    function showCountdown(startCallback) {
       cancelCountdown();
       isCountingDown = true;
       phase = 'countdown';
 
-      // 可選：opts = { showNotes: true, previewTime: <number 秒> }
-      const previewTime = opts && typeof opts.previewTime === 'number' ? opts.previewTime : null;
-      const showNotes = !!(opts && opts.showNotes && previewTime !== null);
-
+      // 倒數時先顯示 receptor（不畫音符）
       const countdownLoop = () => {
         if (!isCountingDown) return;
-        if (showNotes) { renderPreviewAt(previewTime); }
-        else { render({skipNotes:true}); }
+        render({skipNotes:true});
         countdownRAF = requestAnimationFrame(countdownLoop);
       };
       countdownLoop();
@@ -955,73 +864,86 @@
     function stopAndResetBgm(){
       try { bgm.pause(); } catch {}
       try { bgm.currentTime = 0; } catch {}
-      stopPlayGuard();
     }
 
-    /* ====== 音效/音量/播放守護 ====== */
-    const warnBanner = document.getElementById('warnBanner');
-    let audioWarned = false;
-    let _playGuardTimer = null;
+    /* ====== 針對音樂播不出來：新增函式 ====== */
 
-    function setVolumes(percent){
-      const v = Math.max(0, Math.min(100, percent)) / 100;
-      bgm.volume = v; // BGM 就是主音量
-      // 鏘聲用音效池音量（主音量 * SFX_GAIN，上限 1.0）
-      const sfxVol = Math.min(1, v * SFX_GAIN);
-      if (tapPool) tapPool.setVolume(sfxVol);
-      // 也同步設一下原始 <audio>，當作後備
-      hitSound.volume = sfxVol;
+    // 1) 用一次使用者手勢解鎖音訊
+    let __audioUnlocked = false;
+    async function unlockAudioOnce() {
+      if (__audioUnlocked) return;
+      try {
+        const a = new Audio(document.getElementById('hitSound').src);
+        a.volume = 0;
+        await a.play();
+        a.pause();
+        __audioUnlocked = true;
+      } catch (e) {}
     }
-    function initVolumeUI(){
-      const slider = document.getElementById('volumeSlider');
-      const label  = document.getElementById('volumeLabel');
-      const saved = +localStorage.getItem('dfjk.volume') || 80;
-      slider.value = String(saved);
-      label.textContent = `${saved}%`;
-      if (!tapPool) tapPool = new TapSoundPool(hitSound.src, 12);
-      setVolumes(saved);
-      slider.addEventListener('input', ()=>{
-        const val = +slider.value;
-        label.textContent = `${val}%`;
-        setVolumes(val);
-        localStorage.setItem('dfjk.volume', String(val));
+
+    // 2) 等待可播放（含錯誤/逾時）
+    function waitCanPlay(el, timeoutMs=2000) {
+      return new Promise((resolve, reject) => {
+        let to = setTimeout(()=>reject(new Error('timeout')), timeoutMs);
+        const ok = ()=>{ clearTimeout(to); cleanup(); resolve(); };
+        const bad = ()=>{ clearTimeout(to); cleanup(); reject(el.error||new Error('error')); };
+        const cleanup = ()=>{
+          el.removeEventListener('canplay', ok);
+          el.removeEventListener('loadedmetadata', ok);
+          el.removeEventListener('error', bad);
+          el.removeEventListener('stalled', bad);
+          el.removeEventListener('abort', bad);
+          el.removeEventListener('emptied', bad);
+        };
+        el.addEventListener('canplay', ok);
+        el.addEventListener('loadedmetadata', ok);
+        el.addEventListener('error', bad);
+        el.addEventListener('stalled', bad);
+        el.addEventListener('abort', bad);
+        el.addEventListener('emptied', bad);
+        try { el.load(); } catch {}
       });
     }
 
-    function playTapSound(){
-      if (tapPool) tapPool.play();
-      else {
-        try { hitSound.currentTime = 0; hitSound.play().catch(()=>{}); } catch {}
+    // 3) 嘗試多種 URL（encodeURI / 原字串 / NFD / encodeURIComponent）
+    async function pickWorkingUrl(fileName) {
+      const base = 'music/';
+      const nfc = fileName.normalize('NFC');
+      const nfd = fileName.normalize('NFD');
+
+      const candidates = [
+        base + encodeURI(nfc),
+        base + nfc,
+        ...(nfd !== nfc ? [base + encodeURI(nfd), base + nfd] : []),
+        base + encodeURIComponent(nfc),
+      ];
+
+      const probe = document.createElement('audio');
+      probe.preload = 'auto';
+
+      for (const url of candidates) {
+        try {
+          probe.src = url;
+          await waitCanPlay(probe, 2000);
+          return url;
+        } catch {}
       }
+      return candidates[0];
     }
 
-    function showPlayWarning(msg){
-      if (audioWarned) return;
-      audioWarned = true;
-      warnBanner.textContent = msg || '⚠️ 音樂無法播放：請確認檔名/路徑，或點一下畫面再按開始。';
-      warnBanner.style.display = 'block';
-      setTimeout(()=>{ warnBanner.style.display = 'none'; audioWarned=false; }, 3000);
-    }
-
-    function guardAudioPlayback(){
-      stopPlayGuard();
-      const t0 = bgm.currentTime;
-      _playGuardTimer = setTimeout(()=>{
-        const advanced = bgm.currentTime > t0 + 0.05;
-        if (bgm.paused || !advanced) showPlayWarning();
-      }, 1500);
-    }
-    function stopPlayGuard(){
-      if (_playGuardTimer){ clearTimeout(_playGuardTimer); _playGuardTimer = null; }
+    function showPlayWarning(reason) {
+      alert('⚠️ 音樂可能沒有成功播放：' + reason +
+        '\n請確認：\n1) 檔名與 /music 資料夾完全一致（含全形/空白/大小寫）' +
+        '\n2) 若在手機請關閉靜音模式' +
+        '\n3) 使用 http(s) 伺服器而非 file:// 開啟頁面');
     }
 
     /* ====== 輸入（鍵盤＋觸控） ====== */
     window.addEventListener('keydown', e => {
       const k = e.key.toLowerCase();
-      const lane = laneFromKey(k);
 
-      if (lane !== null) {
-        if (phase === 'playing') onLanePress(lane);
+      if (k in keyToLane) {
+        if (phase === 'playing') onLanePress(keyToLane[k]);
         e.preventDefault();
         return;
       }
@@ -1049,13 +971,9 @@
 
     function onLanePress(lane) {
       if (!running) return;
-
-      // 鏘聲：命中或空打都要有
-      playTapSound();
-
       const tNow = (performance.now() - startTime) / 1000;
-      let bestIdx = -1, bestAbs = Infinity;
 
+      let bestIdx = -1, bestAbs = Infinity;
       for (let i = 0; i < chart.length; i++) {
         const n = chart[i];
         if (n.hit || n.lane !== lane) continue;
@@ -1077,7 +995,7 @@
     }
 
     /* ====== 流程 ====== */
-    function startGame() {
+    async function startGame() {
       if (!selectedSongFile) { alert('請先選擇音樂'); showMusic(); return; }
 
       const difficulty = document.getElementById('difficultySelect').value;
@@ -1107,12 +1025,16 @@
       updateHUD();
 
       currentSongTitle = selectedSongFile.replace(/\.mp3$/i, '');
-      const url = 'music/' + encodeURIComponent(selectedSongFile);
-      bgm.src = url; bgm.load();
+
+      // **關鍵修正：解鎖 + 多路徑嘗試**
+      await unlockAudioOnce();
+      const url = await pickWorkingUrl(selectedSongFile);
+      bgm.src = url;
+      try { bgm.load(); } catch {}
 
       // 追蹤音樂結束
       songEnded = false;
-      bgm.onended = () => { songEnded = true; stopPlayGuard(); };
+      bgm.onended = () => { songEnded = true; };
 
       showOnly('gameScreen');
       phase = 'countdown';
@@ -1135,17 +1057,37 @@
       // 建立 sprites（一次性）
       __buildSprites();
 
-      // 開局倒數（維持原本只顯示 receptor）
+      // 播放守護：若 1.5 秒後仍未播放，提醒
+      let watchdogFired = false;
+      setTimeout(()=>{
+        if (!watchdogFired && (bgm.paused || bgm.currentTime === 0)) {
+          showPlayWarning('自動播放被阻擋或路徑不符');
+        }
+      }, 1500);
+      const onAnyPlay = ()=>{ watchdogFired = true; cleanupWatchdog(); };
+      const onAnyErr  = ()=>{ cleanupWatchdog(); showPlayWarning('音訊載入錯誤或 MIME/路徑問題'); };
+      function cleanupWatchdog(){
+        bgm.removeEventListener('play', onAnyPlay);
+        bgm.removeEventListener('timeupdate', onAnyPlay);
+        bgm.removeEventListener('error', onAnyErr);
+        bgm.removeEventListener('stalled', onAnyErr);
+        bgm.removeEventListener('abort', onAnyErr);
+        bgm.removeEventListener('emptied', onAnyErr);
+      }
+      bgm.addEventListener('play', onAnyPlay);
+      bgm.addEventListener('timeupdate', onAnyPlay);
+      bgm.addEventListener('error', onAnyErr);
+      bgm.addEventListener('stalled', onAnyErr);
+      bgm.addEventListener('abort', onAnyErr);
+      bgm.addEventListener('emptied', onAnyErr);
+
+      // 倒數
       showCountdown(() => {
         if (phase !== 'countdown') return;
         phase = 'playing';
-        freezeLayout();     // 進關即固定幾何
+        freezeLayout();     // 進關即固定幾何，打擊圖示不再漂
         startTime = performance.now();
-        try {
-          const p = bgm.play();
-          if (p && typeof p.catch === 'function') p.catch(()=>showPlayWarning());
-        } catch {}
-        guardAudioPlayback();
+        try { bgm.currentTime = 0; bgm.play().catch(()=>{}); } catch {}
         loopId = requestAnimationFrame(loop);
       });
     }
@@ -1160,7 +1102,6 @@
       paused = true;
       phase = 'paused';
       try { bgm.pause(); } catch {}
-      stopPlayGuard();
       stopGameLoop();
       elapsedTimeBeforePause = (performance.now() - startTime) / 1000;
       unfreezeLayout();   // 暫停解除凍結，允許視窗調整
@@ -1171,33 +1112,18 @@
     function resumeGame() {
       if (!paused) return;
       paused = false;
-
-      // 先回到遊戲畫面，但進入倒數階段，不要立刻播放或跑迴圈
+      phase = 'playing';
       showOnly('gameScreen');
       document.getElementById('gameScreen').classList.remove('blur');
 
       applyDesktopScale();
       recomputeLayout();
+      freezeLayout();     // 繼續時再度固定
 
-      // 進入倒數模式：顯示「暫停當下」的譜面預覽
-      phase = 'countdown';
-      showCountdown(() => {
-        // 倒數結束才真正恢復
-        phase = 'playing';
-        freezeLayout(); // 恢復時固定幾何
-
-        // 讓譜面時間點與音樂保持「暫停前」的對齊
-        startTime = performance.now() - (elapsedTimeBeforePause * 1000);
-        __lastRenderTs = 0;
-
-        try {
-          const p = bgm.play();
-          if (p && typeof p.catch === 'function') p.catch(() => showPlayWarning());
-        } catch {}
-
-        guardAudioPlayback();
-        loopId = requestAnimationFrame(loop);
-      }, { showNotes: true, previewTime: elapsedTimeBeforePause });
+      startTime = performance.now() - (elapsedTimeBeforePause * 1000);
+      __lastRenderTs = 0;
+      try { bgm.play().catch(()=>{}); } catch {}
+      loopId = requestAnimationFrame(loop);
     }
 
     /* ====== 初始化 ====== */
@@ -1215,7 +1141,6 @@
     }
 
     applyDesktopScale();
-    initVolumeUI();
     fillSongList();
     window.addEventListener('resize', onViewportChanged, { passive: true });
     window.addEventListener('scroll', () => { if (!__layoutFrozen && (phase==='playing'||phase==='countdown')) recomputeLayout(); }, { passive: true });
