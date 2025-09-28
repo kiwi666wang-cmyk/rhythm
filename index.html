@@ -54,17 +54,15 @@
     /* 手機 + 上升打擊時把暫停鍵移到底部避免蓋到右側 lane */
     .pause-bottom { top: auto !important; bottom: 10px !important; }
 
-    /* 倒數文字：移除閃爍的透明度改為純縮放脈衝 */
+    /* 倒數文字：純縮放脈衝 */
     #countdownText {
       position: absolute; top: 40%; left: 50%; transform: translate(-50%,-50%);
       font-family: 'Fredoka One', sans-serif; font-size: 72px; color: #fff; text-shadow: 2px 2px 8px #000; z-index: 5;
-      pointer-events: none;
-      opacity: 1;            /* 全程維持可見，不用 0/1 跳變 */
-      will-change: transform;
+      pointer-events: none; opacity: 1; will-change: transform;
     }
     @keyframes popScale {
-      0%   { transform: translate(-50%,-50%) scale(0.85); }
-      50%  { transform: translate(-50%,-50%) scale(1.12); }
+      0% { transform: translate(-50%,-50%) scale(0.85); }
+      50% { transform: translate(-50%,-50%) scale(1.12); }
       100% { transform: translate(-50%,-50%) scale(1.00); }
     }
 
@@ -234,7 +232,7 @@
 
     // ====== 手機穩定 60fps（只節流「渲染」，判定仍用真實時間） ======
     const IS_MOBILE = window.matchMedia('(pointer: coarse)').matches;
-    let __fpsMode = IS_MOBILE ? 'stable60' : 'unlocked';  // 手機穩 60；桌機解鎖
+    let __fpsMode = IS_MOBILE ? 'stable60' : 'unlocked';
     let __lastRenderTs = 0;
     const __TARGET_INTERVAL = 1000 / 60;
 
@@ -259,7 +257,28 @@
     let cachedJudgeLineCss = (HITKEY_BASE * uiScale / 2);
     let cachedJudgeLineInternal = cachedJudgeLineCss / cachedScaleY;
 
+    // === 遊戲中凍結版面（避免位移） ===
+    let __layoutFrozen = false;
+    let __frozenRectHeight = null, __frozenScaleY = null, __frozenJudgeCss = null;
+
+    function freezeLayout() {
+      const rect = canvas.getBoundingClientRect();
+      __frozenRectHeight = rect.height;
+      __frozenScaleY = __frozenRectHeight / H;
+      __frozenJudgeCss = (currentDirection === 'up')
+        ? (HITKEY_BASE * uiScale / 2)
+        : (__frozenRectHeight - HITKEY_BASE * uiScale / 2);
+      __layoutFrozen = true;
+      updateHitbarPosition();
+    }
+
+    function unfreezeLayout() {
+      __layoutFrozen = false;
+      recomputeLayout();
+    }
+
     function recomputeLayout() {
+      if (__layoutFrozen) return;
       const rect = canvas.getBoundingClientRect();
       cachedRectHeight = rect.height;
       cachedScaleY = cachedRectHeight / H;
@@ -268,10 +287,11 @@
       updateHitbarPosition();
       positionPauseButton();
     }
-    function getCanvasRect(){ return { height: cachedRectHeight }; }           // 兼容舊函式，不再觸發 reflow
-    function getScaleY(){ return cachedScaleY; }
-    function getJudgeLineYCss(){ return cachedJudgeLineCss; }
-    function getJudgeLineYInternal(){ return cachedJudgeLineInternal; }
+
+    function getCanvasRect(){ return { height: __layoutFrozen ? __frozenRectHeight : cachedRectHeight }; }
+    function getScaleY(){ return __layoutFrozen ? __frozenScaleY : cachedScaleY; }
+    function getJudgeLineYCss(){ return __layoutFrozen ? __frozenJudgeCss : cachedJudgeLineCss; }
+    function getJudgeLineYInternal(){ return getJudgeLineYCss() / getScaleY(); }
 
     // 遊戲狀態
     const keys = ['d','f','j','k'];
@@ -343,9 +363,10 @@
       if (id !== 'gameScreen') document.getElementById('gameScreen').classList.remove('blur');
     }
     function goToMenu() {
-      cancelCountdown();              // <- 防止倒數殘留
-      stopGameLoop();                 // <- 防止遊戲 RAF 殘留
-      stopAndResetBgm();              // <- 立刻停歌
+      cancelCountdown();
+      stopGameLoop();
+      stopAndResetBgm();
+      unfreezeLayout();  // 回選單解除凍結
       showOnly('menuScreen');
       phase = 'menu';
       document.body.classList.remove('ex-mode');
@@ -354,7 +375,7 @@
     function showOptions() { showOnly('optionsScreen'); }
     function showMusic() { showOnly('musicScreen'); }
 
-    // 進站就把曲目清單填好，避免「點了才出現」
+    // 進站就把曲目清單填好
     function fillSongList() {
       const sel = document.getElementById('songSelect');
       if (sel.dataset.filled) return;
@@ -399,7 +420,7 @@
       document.getElementById('judgeLabel').textContent = (currentJudgeMode === 'old' ? 'Old' : 'New');
     }
 
-    /* ====== 視覺（FNF 箭頭 + 現代感） ====== */
+    /* ====== 視覺（現代風箭頭 & 效果） ====== */
     const laneColors = ['#b266ff', '#66ccff', '#66ff66', '#ff6666'];
     const receptorPulse = [0,0,0,0];
     const hitFx = [];
@@ -444,12 +465,109 @@
       drawShape(innerScale, 'gradient', colorLerp(baseColor,'#ffffff',0.25), 6*glow);
     }
     function drawRing(x,y,r,alpha){
+      if (__useLowQuality) return;
       ctx.save(); ctx.globalAlpha = alpha;
       ctx.beginPath(); ctx.arc(x,y,r,0,Math.PI*2);
       ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 3; ctx.stroke();
       ctx.restore();
     }
     function flashKeyByLane(laneIdx) { receptorPulse[laneIdx] = 1; }
+
+    /* === Sprite: 預渲染箭頭/接收器，並修正 DPR 對齊 === */
+    function drawArrowTo(ct, x, y, size, dir, baseColor, glow = 1, innerScale = 0.7){
+      const angle = dirToAngle(dir);
+      const Hh = size * 1.15, Wd = size, headH = Hh * 0.55;
+      const drawShape = (scale=1, fillStyle=baseColor, strokeStyle='#000', shadow=0)=>{
+        ct.save(); ct.translate(x, y); ct.rotate(angle); ct.scale(scale, scale);
+        if (shadow>0){ ct.shadowColor = baseColor; ct.shadowBlur = shadow; }
+        ct.beginPath();
+        ct.moveTo(0, -Hh/2);
+        ct.lineTo(Wd/2, -Hh/2 + headH);
+        ct.lineTo(Wd*0.22, -Hh/2 + headH);
+        ct.lineTo(Wd*0.22,  Hh/2);
+        ct.lineTo(-Wd*0.22, Hh/2);
+        ct.lineTo(-Wd*0.22, -Hh/2 + headH);
+        ct.lineTo(-Wd/2, -Hh/2 + headH);
+        ct.closePath();
+        const grad = ct.createLinearGradient(0, -Hh/2, 0, Hh/2);
+        grad.addColorStop(0, '#ffffff');
+        grad.addColorStop(0.25, colorLerp('#ffffff', baseColor, .2));
+        grad.addColorStop(1, baseColor);
+        ct.fillStyle = grad; ct.fill();
+        ct.lineWidth = 6; ct.strokeStyle = strokeStyle; ct.stroke();
+        ct.restore();
+      };
+      drawShape(1.0, 'gradient', '#000000', 16*glow);
+      drawShape(innerScale, 'gradient', colorLerp(baseColor,'#ffffff',0.25), 6*glow);
+    }
+    function __makeArrowSprite(size, dir, baseColor, opts){
+      const glow = opts.glow ?? 1;
+      const innerScale = opts.innerScale ?? 0.7;
+      const pad = Math.ceil(size*1.6 + 18*glow);
+      const dpr = Math.min(2, window.devicePixelRatio||1);
+      const off = document.createElement('canvas');
+      off.width = off.height = pad*2*dpr;
+      const octx = off.getContext('2d', { alpha:true });
+      octx.scale(dpr, dpr);
+      if (opts.low){
+        const angle = dirToAngle(dir);
+        const Hh = size * 1.15, Wd = size, headH = Hh * 0.55;
+        octx.save(); octx.translate(pad, pad); octx.rotate(angle);
+        octx.beginPath();
+        octx.moveTo(0, -Hh/2);
+        octx.lineTo(Wd/2, -Hh/2 + headH);
+        octx.lineTo(Wd*0.22, -Hh/2 + headH);
+        octx.lineTo(Wd*0.22,  Hh/2);
+        octx.lineTo(-Wd*0.22, Hh/2);
+        octx.lineTo(-Wd*0.22, -Hh/2 + headH);
+        octx.lineTo(-Wd/2, -Hh/2 + headH);
+        octx.closePath();
+        const grad = octx.createLinearGradient(0, -Hh/2, 0, Hh/2);
+        grad.addColorStop(0, '#ffffff');
+        grad.addColorStop(1, baseColor);
+        octx.fillStyle = grad; octx.fill();
+        octx.lineWidth = 3; octx.strokeStyle = '#000'; octx.stroke();
+        octx.restore();
+      } else {
+        drawArrowTo(octx, pad, pad, size, dir, baseColor, glow, innerScale);
+      }
+      // size: 貼圖在「邏輯像素」的邊長（與 dpr 無關），供繪製時使用
+      return { canvas: off, half: pad, size: pad*2 };
+    }
+    const __SPR = { noteHQ:[], recHQ:[], noteLQ:[], recLQ:[] };
+    function __buildSprites(){
+      for (let i=0;i<4;i++){
+        const dir = laneDirs[i], col = laneColors[i];
+        __SPR.noteHQ[i] = __makeArrowSprite(NOTE_BASE, dir, col, { glow: 0.8, innerScale: 0.7 });
+        __SPR.recHQ[i]  = __makeArrowSprite(NOTE_BASE, dir, col, { glow: 1.0, innerScale: 0.7 });
+        __SPR.noteLQ[i] = __makeArrowSprite(NOTE_BASE, dir, col, { low:true });
+        __SPR.recLQ[i]  = __makeArrowSprite(NOTE_BASE, dir, col, { low:true });
+      }
+    }
+    function __drawSprite(sp, x, y, scale=1){
+      // DPR-safe：指定目標寬高為「邏輯尺寸」，避免高 DPI 下自動放大與偏移
+      ctx.save(); ctx.translate(x,y); ctx.scale(scale,scale);
+      ctx.drawImage(sp.canvas, -sp.half, -sp.half, sp.size, sp.size);
+      ctx.restore();
+    }
+
+    /* === Perf: FPS monitor & remain counter === */
+    let __fpsMA = 60, __fpsFrames = 0, __fpsLastTs = 0;
+    let __useLowQuality = false;
+    let __remainNotes = 0;
+
+    function __trackFPS(ts){
+      __fpsFrames++;
+      if(!__fpsLastTs){ __fpsLastTs = ts; return; }
+      const span = ts - __fpsLastTs;
+      if (span >= 300){
+        const inst = __fpsFrames * 1000 / span;
+        __fpsMA = __fpsMA * 0.8 + inst * 0.2;
+        __fpsFrames = 0; __fpsLastTs = ts;
+        if (__fpsMA < 54) __useLowQuality = true;
+        else if (__fpsMA > 58) __useLowQuality = false;
+      }
+    }
 
     /* ====== 判定 ====== */
     function judge(dtMs, lane) {
@@ -510,10 +628,11 @@
           chart.push(...notesThisFrame);
           time += Math.random() * (timeGapMax - timeGapMin) + timeGapMin;
         }
+        __remainNotes = chart.length;
         return;
       }
 
-      // EX / HELL（原本的較密集邏輯）
+      // EX / HELL（較密集邏輯）
       const beat = 0.5;
       let t = 1;
       let laneCursor = 0;
@@ -531,7 +650,7 @@
             pushNote(t + 2 * beat / 3, randLane());
           }
           t += Math.random() < 0.5 ? beat / 2 : beat;
-        } else {
+        } else { // hell
           pushNote(t, nextLane());
           if (Math.random() < 0.85) pushNote(t, (laneCursor + 2) % 4);
           pushNote(t + beat / 2, (laneCursor + 1) % 4);
@@ -542,6 +661,7 @@
           t += beat / 2;
         }
       }
+      __remainNotes = chart.length;
     }
 
     /* ====== 幾何 & 命中判定 ====== */
@@ -577,8 +697,14 @@
     }
 
     function update(t, dt) {
-      chart.forEach(n => { n.y = noteYAtTimeFor(n.t, t); });
-      chart.forEach(n => { if (!n.hit && isTapMiss(n, t)) { n.hit = true; miss(); } });
+      for (let i=0;i<chart.length;i++){
+        const n = chart[i];
+        n.y = noteYAtTimeFor(n.t, t);
+      }
+      for (let i=0;i<chart.length;i++){
+        const n = chart[i];
+        if (!n.hit && isTapMiss(n, t)) { n.hit = true; __remainNotes--; miss(); }
+      }
       for (let i=0;i<4;i++) receptorPulse[i] = Math.max(0, receptorPulse[i] - dt*3.2);
       for (let i = hitFx.length-1; i>=0; i--) if (t - hitFx[i].t0 > hitFx[i].life) hitFx.splice(i,1);
     }
@@ -587,29 +713,37 @@
       const judge = getJudgeLineYInternal();
       ctx.clearRect(0, 0, W, H);
 
-      // receptor（倒數也畫）
+      // receptor
+      const _rec = __useLowQuality ? __SPR.recLQ : __SPR.recHQ;
       for (let lane=0; lane<4; lane++){
         const x = lane * laneWidth + laneWidth / 2;
         const pulse = receptorPulse[lane];
-        const glowScale = 1 + 0.18 * pulse;
-        drawArrow(x, judge, NOTE_BASE * glowScale, laneDirs[lane], laneColors[lane], 0.8 + pulse);
+        const s = 1 + 0.18 * pulse;
+        __drawSprite(_rec[lane], x, judge, s);
       }
 
-      // 音符（倒數時不畫，避免誤解正在開始）
+      // notes（視窗裁剪）
       if (!skipNotes) {
-        chart.forEach(n => {
-          if (n.hit) return;
+        const _note = __useLowQuality ? __SPR.noteLQ : __SPR.noteHQ;
+        const top = -120, bottom = H + 120;
+        for (let i=0;i<chart.length;i++){
+          const n = chart[i];
+          if (n.hit) continue;
+          if (n.y < top || n.y > bottom) continue;
           const x = n.lane * laneWidth + laneWidth / 2;
-          drawArrow(x, n.y, NOTE_BASE, laneDirs[n.lane], laneColors[n.lane], 0.6);
-        });
+          __drawSprite(_note[n.lane], x, n.y, 1);
+        }
       }
 
-      hitFx.forEach(fx=>{
-        const x = fx.lane * laneWidth + laneWidth / 2;
+      // 命中外圈
+      for (let i=0;i<hitFx.length;i++){
+        const fx = hitFx[i];
         const p = Math.min(1, (nowT - fx.t0) / fx.life);
+        const x = fx.lane * laneWidth + laneWidth / 2;
         drawRing(x, judge, 18 + 80*p, 1 - p);
-      });
+      }
 
+      // 判定文字
       if (lastJudgementText !== '-') {
         ctx.fillStyle = '#fff';
         ctx.font = 'bold 32px sans-serif';
@@ -654,6 +788,7 @@
       prevTs = ts;
 
       update(nowT, dt);
+      __trackFPS(ts);
 
       // 手機穩定 60fps 的視覺節奏鎖（不影響判定時間）
       let doRender = true;
@@ -667,7 +802,7 @@
       }
       if (doRender) render();
 
-      if (songEnded || chart.every(n => n.hit)) {
+      if (songEnded || __remainNotes <= 0) {
         endGameAndShowResult();
         return;
       }
@@ -678,7 +813,7 @@
 
     /* ====== 倒數處理（可中止） ====== */
     function showCountdown(startCallback) {
-      cancelCountdown();                 // 確保乾淨
+      cancelCountdown();
       isCountingDown = true;
       phase = 'countdown';
 
@@ -698,24 +833,20 @@
       const playStep = (i) => {
         if (!isCountingDown) return;
         el.textContent = steps[i];
-        // 無閃爍：只做縮放動畫
         el.style.animation = 'none';
-        // 觸發一次重排以重啟動畫
         void el.offsetWidth;
         el.style.animation = 'popScale .55s ease-out';
       };
 
-      // 逐步排程
       for (let i=0;i<steps.length;i++){
         countdownTimers.push(setTimeout(()=>playStep(i), i*stepDur));
       }
-      // 結束後啟動遊戲
       countdownTimers.push(setTimeout(()=>{
         if (!isCountingDown) return;
         el.style.display = 'none';
         isCountingDown = false;
         try { cancelAnimationFrame(countdownRAF); } catch {}
-        startCallback();                 // 真正開始
+        startCallback();
       }, steps.length*stepDur));
     }
 
@@ -741,14 +872,13 @@
       const k = e.key.toLowerCase();
 
       if (k in keyToLane) {
-        // 倒數時禁止打鍵（僅展示 receptor）
         if (phase === 'playing') onLanePress(keyToLane[k]);
         e.preventDefault();
         return;
       }
 
       if (e.key === 'Escape') {
-        if (phase === 'countdown') {        // 倒數中 ESC 直接回主選單且停歌
+        if (phase === 'countdown') {
           cancelCountdown();
           goToMenu();
           return;
@@ -759,7 +889,7 @@
     });
 
     canvas.addEventListener('pointerdown', (e) => {
-      if (phase !== 'playing') return;      // 倒數時不處理點擊
+      if (phase !== 'playing') return;
       e.preventDefault();
       const rect = canvas.getBoundingClientRect();
       const x = e.clientX - rect.left;
@@ -785,6 +915,7 @@
         const n = chart[bestIdx];
         judge((tNow - n.t) * 1000, lane);
         n.hit = true;
+        __remainNotes--;
         flashKeyByLane(lane);
       } else {
         if (currentJudgeMode === 'old') ghostTap(lane);
@@ -826,7 +957,7 @@
       const url = 'music/' + encodeURIComponent(selectedSongFile);
       bgm.src = url; bgm.load();
 
-      // 追蹤音樂結束，避免音符提前清完時無法立刻結算
+      // 追蹤音樂結束
       songEnded = false;
       bgm.onended = () => { songEnded = true; };
 
@@ -836,8 +967,9 @@
       applyDesktopScale();
       recomputeLayout();
       updateHUD();
-      __lastRenderTs = 0; // 重置視覺節奏鎖
+      __lastRenderTs = 0;
 
+      // 準備譜面
       let chartFinalized = false;
       generateChart(120);
       bgm.onloadedmetadata = () => {
@@ -847,10 +979,14 @@
         chartFinalized = true;
       };
 
-      // 倒數（顯示 receptor、不顯示音符；可中止）
+      // 建立 sprites（一次性）
+      __buildSprites();
+
+      // 倒數
       showCountdown(() => {
-        if (phase !== 'countdown') return;  // 若被中止就不啟動
+        if (phase !== 'countdown') return;
         phase = 'playing';
+        freezeLayout();     // 進關即固定幾何，打擊圖示不再漂
         startTime = performance.now();
         try { bgm.currentTime = 0; bgm.play().catch(()=>{}); } catch {}
         loopId = requestAnimationFrame(loop);
@@ -859,7 +995,6 @@
 
     function pauseGame() {
       if (phase === 'countdown') {
-        // 倒數時按暫停鍵：直接視為取消回主選單
         cancelCountdown();
         goToMenu();
         return;
@@ -870,6 +1005,7 @@
       try { bgm.pause(); } catch {}
       stopGameLoop();
       elapsedTimeBeforePause = (performance.now() - startTime) / 1000;
+      unfreezeLayout();   // 暫停解除凍結，允許視窗調整
       document.getElementById('gameScreen').classList.add('blur');
       showOnly('pauseScreen');
     }
@@ -883,21 +1019,22 @@
 
       applyDesktopScale();
       recomputeLayout();
+      freezeLayout();     // 繼續時再度固定
 
       startTime = performance.now() - (elapsedTimeBeforePause * 1000);
-      __lastRenderTs = 0; // 重置視覺節奏鎖
+      __lastRenderTs = 0;
       try { bgm.play().catch(()=>{}); } catch {}
       loopId = requestAnimationFrame(loop);
     }
 
     /* ====== 初始化 ====== */
     function renderIdle() {
-      // 在主選單/選項/音樂頁也能維持舞台比例運算
       if (document.getElementById('gameScreen').style.display === 'block') return;
       recomputeLayout();
     }
 
     function onViewportChanged(){
+      if (__layoutFrozen) return; // 打歌中不響應視窗變化，避免位移
       if (phase === 'playing' || phase === 'countdown') {
         applyDesktopScale();
         recomputeLayout();
@@ -905,14 +1042,20 @@
     }
 
     applyDesktopScale();
-    fillSongList(); // 進站即填歌單
+    fillSongList();
     window.addEventListener('resize', onViewportChanged, { passive: true });
-    window.addEventListener('scroll', () => { if (phase==='playing'||phase==='countdown') recomputeLayout(); }, { passive: true });
+    window.addEventListener('scroll', () => { if (!__layoutFrozen && (phase==='playing'||phase==='countdown')) recomputeLayout(); }, { passive: true });
     if (window.visualViewport) {
       ['resize','scroll'].forEach(ev => {
         window.visualViewport.addEventListener(ev, onViewportChanged, { passive: true });
       });
     }
+    window.addEventListener('orientationchange', () => {
+      unfreezeLayout();
+      applyDesktopScale();
+      recomputeLayout();
+      if (phase === 'playing' || phase === 'countdown') freezeLayout();
+    }, { passive: true });
 
     // 只在遊戲階段才阻止右鍵/縮放/雙擊，避免在選單/選項頁操作回溯
     document.addEventListener("contextmenu", e => { if (phase==='playing'||phase==='countdown') e.preventDefault(); });
@@ -923,7 +1066,6 @@
   </script>
 </body>
 </html>
-
 
 
 
